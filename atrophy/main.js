@@ -1,31 +1,31 @@
 /**
- * Cognify - AI-Powered Brain Analysis
+ * Cognify - Brain MRI Analysis Tool
  *
- * Medical-grade volumetric analysis for detecting brain atrophy
- * and early signs of Alzheimer's disease using AI-powered segmentation
- * and peer-reviewed normative data comparison.
+ * Experimental volumetric analysis tool for brain MRI scans.
+ * Uses AI-based segmentation to analyze brain structures.
  *
- * CREDITS & ACKNOWLEDGMENTS:
- * --------------------------
+ * CREDITS:
  * Built on BrainChop (https://github.com/neuroneural/brainchop)
- * by the neuroneural team. BrainChop provides the core AI-powered
- * brain segmentation capabilities using TensorFlow.js.
+ * by the neuroneural team for brain segmentation using TensorFlow.js.
  *
- * Normative Data Sources:
- * - UK Biobank hippocampal nomograms (Nobis et al., 2019, n=19,793)
- * - ADNI (Alzheimer's Disease Neuroimaging Initiative)
- * - FreeSurfer subcortical norms (Potvin et al., 2016, n=2,713)
- * - BPF systematic review (Vågberg et al., 2017, n=9,269)
+ * Normative data derived from published literature for research purposes.
  *
- * Clinical Scales: Scheltens (MTA), Pasquier (GCA), Koedam (PA), Evans Index
- *
- * DISCLAIMER: For research and educational use only. Not a medical device.
+ * DISCLAIMER: Research prototype only. Not validated for clinical use.
  */
 
 import { Niivue } from "@niivue/niivue";
 import { runInference } from "../brainchop-mainthread.js";
 import { inferenceModelsList, brainChopOpts } from "../brainchop-parameters.js";
 import { isChrome } from "../brainchop-diagnostics.js";
+import {
+  buildEvaluationForm,
+  buildAIResultsDisplay,
+  buildSideBySideView,
+  collectFormData,
+  validateForm,
+  extractAIScores,
+  saveEvaluation
+} from "./radiologist-eval.js";
 
 // ============================================
 // SERVER-SIDE INFERENCE CONFIGURATION
@@ -121,20 +121,9 @@ async function runServerInference(progressCallback) {
 
 // ============================================
 // NORMATIVE DATA - BILATERAL VOLUMES
-// Based on peer-reviewed literature:
-// - Potvin et al. (2016) FreeSurfer subcortical normative data (n=2,713)
-// - UK Biobank hippocampal nomograms Nobis et al. (2019) (n=19,793)
-// - ADNI normative database (Alzheimer's Disease Neuroimaging Initiative)
-// - NeuroQuant/Cortechs.ai normative reference (FDA-cleared)
-// - Vågberg et al. (2017) BPF systematic review (n=9,269)
-//
-// All values are BILATERAL (left + right combined) to match
-// the segmentation output which combines hemispheres.
-//
-// VALIDATION NOTE: These values have been cross-validated against:
-// - UK Biobank: Bilateral hippocampus ~7100mm³ at age 75 (Nobis et al.)
-// - ADNI controls: BPF 72-78% for ages 70-80
-// - FreeSurfer 6.0 output characteristics
+// Reference values derived from published studies.
+// All values are BILATERAL (left + right combined).
+// For experimental/research use.
 // ============================================
 
 const NORMATIVE_DATA = {
@@ -147,14 +136,16 @@ const NORMATIVE_DATA = {
       // Large structure - values from FreeSurfer normative studies
       mean: { male: [470000, 460000, 440000, 400000], female: [420000, 410000, 390000, 355000] },
       sd: { male: 45000, female: 40000 },
-      clinicalName: "Cerebral White Matter",
+      clinicalName: "Supratentorial White Matter",
+      abbreviation: "WM",
       description: "Major white matter tracts",
       clinicalSignificance: "low"  // Large structures have high variability
     },
     "Cerebral-Cortex": {
       mean: { male: [520000, 500000, 470000, 420000], female: [470000, 450000, 420000, 380000] },
       sd: { male: 50000, female: 45000 },
-      clinicalName: "Cerebral Cortex",
+      clinicalName: "Cerebral Cortex (Gray Matter)",
+      abbreviation: "GM",
       description: "Gray matter of cerebral hemispheres",
       clinicalSignificance: "medium"
     },
@@ -164,6 +155,7 @@ const NORMATIVE_DATA = {
       mean: { male: [14000, 18000, 28000, 45000], female: [12000, 15000, 24000, 38000] },
       sd: { male: 8000, female: 7000 },
       clinicalName: "Lateral Ventricles",
+      abbreviation: "LV",
       description: "CSF-filled cavities - enlarge with atrophy",
       invertZscore: true,  // Larger = more atrophy (negative z-score)
       clinicalSignificance: "high"
@@ -172,7 +164,8 @@ const NORMATIVE_DATA = {
       // Temporal horns - very sensitive marker for medial temporal atrophy
       mean: { male: [600, 900, 1500, 2800], female: [500, 750, 1300, 2400] },
       sd: { male: 500, female: 450 },
-      clinicalName: "Inferior Lateral Ventricles (Temporal Horns)",
+      clinicalName: "Temporal Horns (ILV)",
+      abbreviation: "TH",
       description: "Temporal horn - enlarges with hippocampal atrophy",
       invertZscore: true,
       clinicalSignificance: "high"
@@ -181,6 +174,7 @@ const NORMATIVE_DATA = {
       mean: { male: [28000, 27000, 25000, 22000], female: [25000, 24000, 22000, 19000] },
       sd: { male: 3500, female: 3000 },
       clinicalName: "Cerebellar White Matter",
+      abbreviation: "CbWM",
       description: "White matter of cerebellum",
       clinicalSignificance: "low"
     },
@@ -188,6 +182,7 @@ const NORMATIVE_DATA = {
       mean: { male: [105000, 100000, 92000, 82000], female: [95000, 90000, 83000, 74000] },
       sd: { male: 12000, female: 10000 },
       clinicalName: "Cerebellar Cortex",
+      abbreviation: "CbCx",
       description: "Gray matter of cerebellum",
       clinicalSignificance: "low"
     },
@@ -196,7 +191,8 @@ const NORMATIVE_DATA = {
       // Reference: Potvin et al. 2016, ENIGMA consortium
       mean: { male: [16400, 15600, 14400, 12800], female: [14800, 14000, 13000, 11600] },
       sd: { male: 1400, female: 1200 },
-      clinicalName: "Thalamus",
+      clinicalName: "Thalami (Bilateral)",
+      abbreviation: "Thal",
       description: "Relay center for sensory information",
       clinicalSignificance: "medium"
     },
@@ -204,7 +200,8 @@ const NORMATIVE_DATA = {
       // BILATERAL caudate nucleus
       mean: { male: [8000, 7400, 6600, 5600], female: [7200, 6600, 5800, 5000] },
       sd: { male: 900, female: 800 },
-      clinicalName: "Caudate Nucleus",
+      clinicalName: "Caudate Nuclei",
+      abbreviation: "Caud",
       description: "Part of basal ganglia - motor control and cognition",
       clinicalSignificance: "medium"
     },
@@ -212,7 +209,8 @@ const NORMATIVE_DATA = {
       // BILATERAL putamen
       mean: { male: [11600, 10800, 9600, 8200], female: [10400, 9600, 8600, 7400] },
       sd: { male: 1100, female: 1000 },
-      clinicalName: "Putamen",
+      clinicalName: "Putamina (Bilateral)",
+      abbreviation: "Put",
       description: "Part of basal ganglia - motor learning",
       clinicalSignificance: "medium"
     },
@@ -220,7 +218,8 @@ const NORMATIVE_DATA = {
       // BILATERAL globus pallidus
       mean: { male: [3800, 3600, 3300, 2900], female: [3400, 3200, 2900, 2560] },
       sd: { male: 380, female: 340 },
-      clinicalName: "Globus Pallidus",
+      clinicalName: "Globi Pallidi",
+      abbreviation: "GP",
       description: "Part of basal ganglia - movement regulation",
       clinicalSignificance: "medium"
     },
@@ -231,7 +230,8 @@ const NORMATIVE_DATA = {
       // Typical bilateral volume at age 70: ~7000mm³ for males
       mean: { male: [8600, 8200, 7400, 6400], female: [7800, 7400, 6700, 5800] },
       sd: { male: 700, female: 650 },
-      clinicalName: "Hippocampus",
+      clinicalName: "Hippocampi (Bilateral)",
+      abbreviation: "Hippo",
       description: "Memory formation - key structure in Alzheimer's disease",
       clinicalSignificance: "critical",
       mciThreshold: -1.5,  // Z-score threshold for MCI concern
@@ -241,7 +241,8 @@ const NORMATIVE_DATA = {
       // BILATERAL amygdala
       mean: { male: [3400, 3240, 2960, 2600], female: [3100, 2940, 2700, 2360] },
       sd: { male: 360, female: 320 },
-      clinicalName: "Amygdala",
+      clinicalName: "Amygdalae (Bilateral)",
+      abbreviation: "Amyg",
       description: "Emotional processing - affected in frontotemporal dementia",
       clinicalSignificance: "high"
     },
@@ -249,14 +250,16 @@ const NORMATIVE_DATA = {
       // BILATERAL nucleus accumbens
       mean: { male: [1200, 1120, 980, 820], female: [1080, 1000, 880, 740] },
       sd: { male: 160, female: 140 },
-      clinicalName: "Nucleus Accumbens",
+      clinicalName: "Nuclei Accumbentes",
+      abbreviation: "NAc",
       description: "Reward processing",
       clinicalSignificance: "low"
     },
     "Brain-Stem": {
       mean: { male: [22000, 21500, 20500, 19000], female: [19500, 19000, 18000, 16700] },
       sd: { male: 2200, female: 2000 },
-      clinicalName: "Brain Stem",
+      clinicalName: "Brainstem",
+      abbreviation: "BS",
       description: "Vital functions control",
       clinicalSignificance: "low"
     },
@@ -265,6 +268,7 @@ const NORMATIVE_DATA = {
       mean: { male: [8400, 8000, 7400, 6600], female: [7600, 7200, 6600, 6000] },
       sd: { male: 800, female: 700 },
       clinicalName: "Ventral Diencephalon",
+      abbreviation: "VDC",
       description: "Hypothalamus and related structures",
       clinicalSignificance: "low"
     },
@@ -272,6 +276,7 @@ const NORMATIVE_DATA = {
       mean: { male: [800, 1000, 1400, 2000], female: [700, 900, 1200, 1700] },
       sd: { male: 350, female: 300 },
       clinicalName: "Third Ventricle",
+      abbreviation: "V3",
       description: "Midline CSF space",
       invertZscore: true,
       clinicalSignificance: "medium"
@@ -283,6 +288,7 @@ const NORMATIVE_DATA = {
       mean: { male: [1400, 1500, 1700, 2000], female: [1200, 1300, 1500, 1800] },
       sd: { male: 500, female: 450 },  // Increased SD for high variability
       clinicalName: "Fourth Ventricle",
+      abbreviation: "V4",
       description: "Posterior fossa CSF space",
       invertZscore: true,
       clinicalSignificance: "low"
@@ -548,7 +554,7 @@ const STANDARDIZED_SCALES = {
     },
     // We'll estimate from ventricle volume ratio to ICV
     // Using cube root approximation for width from volume
-    ventricleVolumeToIndex: function(ventricleVol, icv) {
+    ventricleVolumeToIndex: function (ventricleVol, icv) {
       // Approximate: Evans ≈ 0.37 × (LV_volume / ICV)^(1/3)
       // Calibrated to give ~0.25 for normal and ~0.35 for enlarged
       const ratio = ventricleVol / icv;
@@ -625,6 +631,710 @@ const CLINICAL_PATTERNS = {
     clinicalNote: "HOC may detect subtle changes before volumetric measures. Consider neuropsychological testing."
   }
 };
+
+// ============================================
+// DEMENTIA RISK SCORING (0-5 Scale)
+// Converts volumetric analysis to numeric risk score
+// ============================================
+
+const RISK_SCORE_LABELS = {
+  0: "No Risk",
+  1: "Minimal Risk",
+  2: "Low Risk",
+  3: "Moderate Risk",
+  4: "High Risk",
+  5: "Very High Risk"
+};
+
+/**
+ * Calculate dementia risk score (0-5) from analysis results
+ * Incorporates hippocampal volume, HOC, BPF, and clinical pattern findings
+ * @param {Object} results - Analysis results object
+ * @returns {Object} Risk score and contributing factors
+ */
+function calculateDementiaRiskScore(results) {
+  if (!results) return { score: null, factors: [], confidence: "low" };
+
+  let score = 0;
+  const factors = [];
+  let confidence = "moderate";
+
+  // Factor 1: Hippocampal z-score (most critical)
+  const hippoZ = results.regions?.["Hippocampus"]?.effectiveZscore;
+  if (hippoZ !== undefined) {
+    if (hippoZ < -2.5) {
+      score += 2;
+      factors.push("Severe hippocampal atrophy");
+    } else if (hippoZ < -2.0) {
+      score += 1.5;
+      factors.push("Moderate hippocampal atrophy");
+    } else if (hippoZ < -1.5) {
+      score += 1;
+      factors.push("Mild hippocampal atrophy");
+    } else if (hippoZ < -1.0) {
+      score += 0.5;
+      factors.push("Low-normal hippocampal volume");
+    }
+  }
+
+  // Factor 2: HOC (Hippocampal Occupancy Score)
+  const hoc = results.hoc?.value;
+  if (hoc !== undefined && hoc !== null) {
+    if (hoc < 0.60) {
+      score += 1.5;
+      factors.push("Severe HOC reduction");
+    } else if (hoc < 0.70) {
+      score += 1;
+      factors.push("Moderate HOC reduction");
+    } else if (hoc < 0.80) {
+      score += 0.5;
+      factors.push("Mild HOC reduction");
+    }
+  }
+
+  // Factor 3: BPF (Brain Parenchymal Fraction)
+  const bpfZ = results.bpf?.zscore;
+  if (bpfZ !== undefined) {
+    if (bpfZ < -2.5) {
+      score += 1;
+      factors.push("Significant global atrophy");
+    } else if (bpfZ < -2.0) {
+      score += 0.5;
+      factors.push("Moderate global atrophy");
+    }
+  }
+
+  // Factor 4: Clinical pattern detection
+  const patterns = results.clinicalPatterns || [];
+  for (const pattern of patterns) {
+    if (pattern.pattern.includes("Alzheimer") && pattern.confidence === "High") {
+      score += 0.5;
+      factors.push("AD pattern detected");
+    }
+  }
+
+  // Factor 5: Temporal horn enlargement
+  const ilvZ = results.regions?.["Inferior-Lateral-Ventricle"]?.zscore;
+  if (ilvZ !== undefined && ilvZ > 1.5) {
+    score += 0.5;
+    factors.push("Temporal horn enlargement");
+  }
+
+  // Round and clamp to 0-5
+  score = Math.round(score * 2) / 2; // Round to nearest 0.5
+  score = Math.min(5, Math.max(0, Math.round(score)));
+
+  // Determine confidence
+  if (results.validation?.flags?.overallQuality === "review_recommended") {
+    confidence = "low";
+  } else if (factors.length >= 3) {
+    confidence = "high";
+  }
+
+  return {
+    score,
+    label: RISK_SCORE_LABELS[score],
+    factors,
+    confidence
+  };
+}
+
+// ============================================
+// BENCHMARK MODE HANDLING
+// Supports three modes for AI vs radiologist comparison
+// ============================================
+
+/**
+ * Get the current benchmark mode
+ * @returns {string} 'ai-first' | 'radiologist-first' | 'radiologist-only'
+ */
+function getBenchmarkMode() {
+  const selector = document.getElementById("benchmarkMode");
+  return selector ? selector.value : "ai-first";
+}
+
+/**
+ * Handle benchmark mode selector change
+ * Updates the hint text and stores mode preference
+ */
+function handleBenchmarkModeChange() {
+  const mode = getBenchmarkMode();
+  const hintEl = document.getElementById("benchmarkHint");
+
+  const hints = {
+    "ai-first": "AI results shown first, then manual review",
+    "radiologist-first": "You assess first, then AI results revealed",
+    "radiologist-only": "AI results hidden, manual assessment only"
+  };
+
+  if (hintEl) {
+    hintEl.textContent = hints[mode] || "";
+  }
+
+  // Store in analysis results if available
+  if (analysisResults) {
+    analysisResults.benchmarkMode = mode;
+  }
+}
+
+/**
+ * Handle radiologist risk input change
+ * Updates the comparison display and checks for discrepancies
+ * In radiologist-first mode, enables the reveal button after score entry
+ */
+function handleRadiologistRiskInput() {
+  const radiologistInput = document.getElementById("radiologistRiskInput");
+  const radiologistScore = radiologistInput.value;
+  const radiologistLabel = document.getElementById("radiologistRiskLabel");
+  const discrepancyAlert = document.getElementById("discrepancyAlert");
+  const discrepancyText = document.getElementById("discrepancyText");
+  const revealSection = document.getElementById("revealAiSection");
+  const mode = getBenchmarkMode();
+
+  if (radiologistScore === "") {
+    radiologistLabel.innerHTML = "&nbsp;";
+    discrepancyAlert.style.display = "none";
+    if (revealSection && mode === "radiologist-first") {
+      revealSection.style.display = "none";
+    }
+    return;
+  }
+
+  const scoreNum = parseInt(radiologistScore, 10);
+  radiologistLabel.textContent = RISK_SCORE_LABELS[scoreNum];
+
+  // Store in analysis results for export with timestamp
+  if (analysisResults) {
+    analysisResults.radiologistRiskScore = scoreNum;
+    analysisResults.radiologistScoreTimestamp = new Date().toISOString();
+  }
+
+  // In radiologist-first mode, show reveal button after score entry
+  if (mode === "radiologist-first" && revealSection) {
+    const aiColumn = document.getElementById("aiResultsColumn");
+    if (aiColumn && aiColumn.style.display === "none") {
+      revealSection.style.display = "block";
+    }
+  }
+
+  // Check for discrepancy with AI score (only if AI is visible)
+  const aiColumn = document.getElementById("aiResultsColumn");
+  const aiVisible = aiColumn && aiColumn.style.display !== "none";
+  const aiScore = analysisResults?.dementiaRiskScore?.score;
+
+  if (aiVisible && aiScore !== null && aiScore !== undefined) {
+    const discrepancy = Math.abs(aiScore - scoreNum);
+    if (discrepancy >= 2) {
+      discrepancyText.textContent = `Discrepancy noted: Model score (${aiScore}) differs from manual score (${scoreNum}) by ${discrepancy} points`;
+      discrepancyAlert.style.display = "flex";
+    } else {
+      discrepancyAlert.style.display = "none";
+    }
+  }
+}
+
+/**
+ * Reveal AI results in radiologist-first mode
+ * Called when user clicks "Reveal AI Results" button
+ */
+function revealAiResults() {
+  const aiColumn = document.getElementById("aiResultsColumn");
+  const placeholder = document.getElementById("aiHiddenPlaceholder");
+  const revealSection = document.getElementById("revealAiSection");
+  const modeLabel = document.getElementById("assessmentModeLabel");
+
+  // Show AI results
+  if (aiColumn) aiColumn.style.display = "block";
+  if (placeholder) placeholder.style.display = "none";
+  if (revealSection) revealSection.style.display = "none";
+
+  // Update mode label
+  if (modeLabel) {
+    modeLabel.textContent = "AI Revealed";
+  }
+
+  // Record reveal timestamp for benchmarking
+  if (analysisResults) {
+    analysisResults.aiRevealedTimestamp = new Date().toISOString();
+  }
+
+  // Now check for discrepancy since AI is visible
+  handleRadiologistRiskInput();
+}
+
+/**
+ * Display the risk comparison card with AI and radiologist scores
+ * Respects the selected benchmark mode for show/hide logic
+ */
+function displayRiskComparison() {
+  if (!analysisResults) return;
+
+  const card = document.getElementById("riskComparisonCard");
+  if (!card) return;
+
+  // Get current benchmark mode
+  const mode = getBenchmarkMode();
+  analysisResults.benchmarkMode = mode;
+  analysisResults.analysisTimestamp = new Date().toISOString();
+
+  // Calculate AI dementia risk score (always calculate, but may hide display)
+  const riskResult = calculateDementiaRiskScore(analysisResults);
+  analysisResults.dementiaRiskScore = riskResult;
+
+  // Display the card
+  card.style.display = "block";
+
+  // Get UI elements
+  const aiColumn = document.getElementById("aiResultsColumn");
+  const aiPlaceholder = document.getElementById("aiHiddenPlaceholder");
+  const radiologistColumn = document.getElementById("radiologistColumn");
+  const revealSection = document.getElementById("revealAiSection");
+  const modeLabel = document.getElementById("assessmentModeLabel");
+  const aiScoreEl = document.getElementById("aiRiskScore");
+  const aiLabelEl = document.getElementById("aiRiskLabel");
+  const aiFactorsEl = document.getElementById("aiRiskFactors");
+
+  // Update AI score display (populate values regardless of visibility)
+  if (riskResult.score !== null) {
+    aiScoreEl.textContent = riskResult.score;
+    aiScoreEl.className = `risk-score-value risk-${riskResult.score}`;
+    aiLabelEl.textContent = riskResult.label;
+
+    // Display contributing factors
+    if (riskResult.factors.length > 0) {
+      aiFactorsEl.innerHTML = riskResult.factors.map(f =>
+        `<div class="risk-factor-item">• ${f}</div>`
+      ).join("");
+    } else {
+      aiFactorsEl.innerHTML = '<div class="risk-factor-item">• No concerning findings</div>';
+    }
+  } else {
+    aiScoreEl.textContent = "--";
+    aiScoreEl.className = "risk-score-value";
+    aiLabelEl.textContent = "Unable to calculate";
+    aiFactorsEl.innerHTML = "";
+  }
+
+  // Apply benchmark mode visibility
+  switch (mode) {
+    case "ai-first":
+      // Show AI results immediately
+      if (aiColumn) aiColumn.style.display = "block";
+      if (aiPlaceholder) aiPlaceholder.style.display = "none";
+      if (radiologistColumn) radiologistColumn.style.display = "block";
+      if (revealSection) revealSection.style.display = "none";
+      if (modeLabel) modeLabel.textContent = "AI-First Mode";
+      break;
+
+    case "radiologist-first":
+      // Hide AI results until radiologist enters score and clicks reveal
+      if (aiColumn) aiColumn.style.display = "none";
+      if (aiPlaceholder) aiPlaceholder.style.display = "block";
+      if (radiologistColumn) radiologistColumn.style.display = "block";
+      if (revealSection) revealSection.style.display = "none"; // Shown after score entry
+      if (modeLabel) modeLabel.textContent = "Radiologist-First Mode";
+      break;
+
+    case "radiologist-only":
+      // Hide AI completely
+      if (aiColumn) aiColumn.style.display = "none";
+      if (aiPlaceholder) aiPlaceholder.style.display = "none";
+      if (radiologistColumn) radiologistColumn.style.display = "block";
+      if (revealSection) revealSection.style.display = "none";
+      if (modeLabel) modeLabel.textContent = "Radiologist-Only Mode";
+      break;
+  }
+
+  // Reset radiologist input
+  const radiologistInput = document.getElementById("radiologistRiskInput");
+  if (radiologistInput) {
+    radiologistInput.value = "";
+  }
+  const radiologistLabel = document.getElementById("radiologistRiskLabel");
+  if (radiologistLabel) {
+    radiologistLabel.innerHTML = "&nbsp;";
+  }
+  const discrepancyAlert = document.getElementById("discrepancyAlert");
+  if (discrepancyAlert) {
+    discrepancyAlert.style.display = "none";
+  }
+}
+
+// ============================================
+// ASYMMETRY TRACKING & LOBAR ANALYSIS
+// Phase 2: Advanced analysis features
+// ============================================
+
+/**
+ * Left-Right region pairs for asymmetry analysis
+ * Maps to 104-class model labels
+ */
+const LEFT_RIGHT_PAIRS = {
+  hippocampus: { left: "Left-Hippocampus", right: "Right-Hippocampus", clinicalName: "Hippocampus" },
+  amygdala: { left: "Left-Amygdala", right: "Right-Amygdala", clinicalName: "Amygdala" },
+  thalamus: { left: "Left-Thalamus-Proper*", right: "Right-Thalamus-Proper*", clinicalName: "Thalamus" },
+  caudate: { left: "Left-Caudate", right: "Right-Caudate", clinicalName: "Caudate" },
+  putamen: { left: "Left-Putamen", right: "Right-Putamen", clinicalName: "Putamen" },
+  pallidum: { left: "Left-Pallidum", right: "Right-Pallidum", clinicalName: "Pallidum" },
+  lateralVentricle: { left: "Left-Lateral-Ventricle", right: "Right-Lateral-Ventricle", clinicalName: "Lateral Ventricle" },
+  infLatVent: { left: "Left-Inf-Lat-Vent", right: "Right-Inf-Lat-Vent", clinicalName: "Temporal Horn" },
+  accumbens: { left: "Left-Accumbens-area", right: "Right-Accumbens-area", clinicalName: "Accumbens" },
+  ventralDC: { left: "Left-VentralDC", right: "Right-VentralDC", clinicalName: "Ventral DC" },
+  cerebralWM: { left: "Left-Cerebral-White-Matter", right: "Right-Cerebral-White-Matter", clinicalName: "Cerebral WM" },
+  cerebellumWM: { left: "Left-Cerebellum-White-Matter", right: "Right-Cerebellum-White-Matter", clinicalName: "Cerebellar WM" },
+  cerebellumCortex: { left: "Left-Cerebellum-Cortex", right: "Right-Cerebellum-Cortex", clinicalName: "Cerebellar Cortex" }
+};
+
+/**
+ * Lobar mapping for cortical regions
+ * Maps FreeSurfer cortical labels to lobes
+ */
+const LOBAR_MAPPING = {
+  frontal: {
+    name: "Frontal Lobe",
+    regions: [
+      "ctx-lh-superiorfrontal", "ctx-rh-superiorfrontal",
+      "ctx-lh-rostralmiddlefrontal", "ctx-rh-rostralmiddlefrontal",
+      "ctx-lh-caudalmiddlefrontal", "ctx-rh-caudalmiddlefrontal",
+      "ctx-lh-parsopercularis", "ctx-rh-parsopercularis",
+      "ctx-lh-parstriangularis", "ctx-rh-parstriangularis",
+      "ctx-lh-parsorbitalis", "ctx-rh-parsorbitalis",
+      "ctx-lh-lateralorbitofrontal", "ctx-rh-lateralorbitofrontal",
+      "ctx-lh-medialorbitofrontal", "ctx-rh-medialorbitofrontal",
+      "ctx-lh-precentral", "ctx-rh-precentral",
+      "ctx-lh-paracentral", "ctx-rh-paracentral",
+      "ctx-lh-frontalpole", "ctx-rh-frontalpole"
+    ],
+    subcortical: ["Left-Caudate", "Right-Caudate"]
+  },
+  temporal: {
+    name: "Temporal Lobe",
+    regions: [
+      "ctx-lh-superiortemporal", "ctx-rh-superiortemporal",
+      "ctx-lh-middletemporal", "ctx-rh-middletemporal",
+      "ctx-lh-inferiortemporal", "ctx-rh-inferiortemporal",
+      "ctx-lh-bankssts", "ctx-rh-bankssts",
+      "ctx-lh-fusiform", "ctx-rh-fusiform",
+      "ctx-lh-transversetemporal", "ctx-rh-transversetemporal",
+      "ctx-lh-entorhinal", "ctx-rh-entorhinal",
+      "ctx-lh-temporalpole", "ctx-rh-temporalpole",
+      "ctx-lh-parahippocampal", "ctx-rh-parahippocampal"
+    ],
+    subcortical: ["Left-Hippocampus", "Right-Hippocampus", "Left-Amygdala", "Right-Amygdala"]
+  },
+  parietal: {
+    name: "Parietal Lobe",
+    regions: [
+      "ctx-lh-superiorparietal", "ctx-rh-superiorparietal",
+      "ctx-lh-inferiorparietal", "ctx-rh-inferiorparietal",
+      "ctx-lh-supramarginal", "ctx-rh-supramarginal",
+      "ctx-lh-postcentral", "ctx-rh-postcentral",
+      "ctx-lh-precuneus", "ctx-rh-precuneus"
+    ],
+    subcortical: []
+  },
+  occipital: {
+    name: "Occipital Lobe",
+    regions: [
+      "ctx-lh-lateraloccipital", "ctx-rh-lateraloccipital",
+      "ctx-lh-lingual", "ctx-rh-lingual",
+      "ctx-lh-cuneus", "ctx-rh-cuneus",
+      "ctx-lh-pericalcarine", "ctx-rh-pericalcarine"
+    ],
+    subcortical: []
+  },
+  cingulate: {
+    name: "Cingulate",
+    regions: [
+      "ctx-lh-caudalanteriorcingulate", "ctx-rh-caudalanteriorcingulate",
+      "ctx-lh-rostralanteriorcingulate", "ctx-rh-rostralanteriorcingulate",
+      "ctx-lh-posteriorcingulate", "ctx-rh-posteriorcingulate",
+      "ctx-lh-isthmuscingulate", "ctx-rh-isthmuscingulate"
+    ],
+    subcortical: []
+  },
+  insula: {
+    name: "Insula",
+    regions: ["ctx-lh-insula", "ctx-rh-insula"],
+    subcortical: []
+  }
+};
+
+/**
+ * Asymmetry interpretation thresholds
+ */
+const ASYMMETRY_THRESHOLDS = {
+  symmetric: { max: 5, label: "Symmetric", color: "#22c55e" },
+  mild: { min: 5, max: 10, label: "Mild Asymmetry", color: "#84cc16" },
+  moderate: { min: 10, max: 20, label: "Moderate Asymmetry", color: "#f59e0b" },
+  severe: { min: 20, label: "Severe Asymmetry", color: "#ef4444" }
+};
+
+/**
+ * Calculate asymmetry index for a structure
+ * AI = |L - R| / ((L + R) / 2) × 100%
+ * @param {number} leftVol - Left side volume
+ * @param {number} rightVol - Right side volume
+ * @returns {Object} Asymmetry metrics
+ */
+function calculateAsymmetryIndex(leftVol, rightVol) {
+  if (!leftVol || !rightVol || leftVol <= 0 || rightVol <= 0) {
+    return null;
+  }
+
+  const mean = (leftVol + rightVol) / 2;
+  const diff = Math.abs(leftVol - rightVol);
+  const asymmetryIndex = (diff / mean) * 100;
+  const laterality = leftVol > rightVol ? "Left > Right" : leftVol < rightVol ? "Right > Left" : "Equal";
+
+  // Determine interpretation
+  let interpretation;
+  if (asymmetryIndex < 5) {
+    interpretation = ASYMMETRY_THRESHOLDS.symmetric;
+  } else if (asymmetryIndex < 10) {
+    interpretation = ASYMMETRY_THRESHOLDS.mild;
+  } else if (asymmetryIndex < 20) {
+    interpretation = ASYMMETRY_THRESHOLDS.moderate;
+  } else {
+    interpretation = ASYMMETRY_THRESHOLDS.severe;
+  }
+
+  return {
+    leftVolume: leftVol,
+    rightVolume: rightVol,
+    asymmetryIndex: asymmetryIndex,
+    laterality: laterality,
+    interpretation: interpretation.label,
+    color: interpretation.color,
+    isConcerning: asymmetryIndex >= 10
+  };
+}
+
+/**
+ * Calculate asymmetry metrics for all paired structures
+ * @param {Object} regionVolumes - Volume data from segmentation
+ * @returns {Object} Asymmetry results
+ */
+function calculateAsymmetryMetrics(regionVolumes) {
+  const asymmetryResults = {};
+  let concerningCount = 0;
+
+  for (const [key, pair] of Object.entries(LEFT_RIGHT_PAIRS)) {
+    const leftVol = regionVolumes[pair.left];
+    const rightVol = regionVolumes[pair.right];
+
+    if (leftVol && rightVol) {
+      const result = calculateAsymmetryIndex(leftVol, rightVol);
+      if (result) {
+        asymmetryResults[key] = {
+          ...result,
+          clinicalName: pair.clinicalName
+        };
+        if (result.isConcerning) concerningCount++;
+      }
+    }
+  }
+
+  return {
+    regions: asymmetryResults,
+    concerningCount: concerningCount,
+    summary: concerningCount > 2 ? "Multiple concerning asymmetries" :
+      concerningCount > 0 ? "Some asymmetry detected" : "Generally symmetric"
+  };
+}
+
+/**
+ * Calculate Global Atrophy Index (0-100 scale)
+ * Combines BPF, total brain z-score, and weighted regional scores
+ * @param {Object} results - Analysis results
+ * @returns {Object} Global atrophy index
+ */
+function calculateGlobalAtrophyIndex(results) {
+  if (!results) return null;
+
+  let score = 50; // Baseline (normal = 50)
+  const factors = [];
+
+  // Factor 1: BPF z-score (weight: 30%)
+  if (results.bpf?.zscore !== undefined) {
+    const bpfContribution = Math.min(15, Math.max(-15, results.bpf.zscore * -5));
+    score += bpfContribution;
+    if (results.bpf.zscore < -1.5) {
+      factors.push("Reduced brain parenchymal fraction");
+    }
+  }
+
+  // Factor 2: Mean regional z-score for critical regions (weight: 40%)
+  const criticalRegions = ["Hippocampus", "Thalamus", "Caudate", "Putamen"];
+  let criticalZScoreSum = 0;
+  let criticalCount = 0;
+
+  for (const region of criticalRegions) {
+    const regionData = results.regions?.[region];
+    if (regionData?.effectiveZscore !== undefined) {
+      criticalZScoreSum += regionData.effectiveZscore;
+      criticalCount++;
+    }
+  }
+
+  if (criticalCount > 0) {
+    const meanCriticalZ = criticalZScoreSum / criticalCount;
+    const criticalContribution = Math.min(20, Math.max(-20, meanCriticalZ * -6));
+    score += criticalContribution;
+    if (meanCriticalZ < -1.5) {
+      factors.push("Critical region atrophy");
+    }
+  }
+
+  // Factor 3: Ventricular enlargement (weight: 30%)
+  const ventricleZ = results.regions?.["Lateral-Ventricle"]?.zscore;
+  if (ventricleZ !== undefined) {
+    // Higher ventricle z-score = more atrophy (inverted for ventricles)
+    const ventContribution = Math.min(15, Math.max(-15, ventricleZ * 4));
+    score += ventContribution;
+    if (ventricleZ > 1.5) {
+      factors.push("Ventricular enlargement");
+    }
+  }
+
+  // Clamp to 0-100
+  score = Math.min(100, Math.max(0, score));
+
+  // Interpretation
+  let interpretation, severity;
+  if (score < 30) {
+    interpretation = "Minimal atrophy";
+    severity = "normal";
+  } else if (score < 45) {
+    interpretation = "Mild global atrophy";
+    severity = "mild";
+  } else if (score < 60) {
+    interpretation = "Age-appropriate";
+    severity = "normal";
+  } else if (score < 75) {
+    interpretation = "Moderate global atrophy";
+    severity = "moderate";
+  } else {
+    interpretation = "Significant global atrophy";
+    severity = "severe";
+  }
+
+  return {
+    value: Math.round(score),
+    interpretation: interpretation,
+    severity: severity,
+    factors: factors
+  };
+}
+
+/**
+ * Calculate lobar atrophy scores
+ * @param {Object} regionVolumes - Volume data from segmentation
+ * @param {Object} regionResults - Z-scores and interpretations
+ * @returns {Object} Lobar atrophy results
+ */
+function calculateLobarAtrophy(regionVolumes, regionResults) {
+  const lobarResults = {};
+
+  for (const [lobeName, lobeData] of Object.entries(LOBAR_MAPPING)) {
+    let totalVolume = 0;
+    let zScoreSum = 0;
+    let zScoreCount = 0;
+
+    // Sum cortical regions
+    for (const region of lobeData.regions) {
+      if (regionVolumes[region]) {
+        totalVolume += regionVolumes[region];
+      }
+      if (regionResults?.[region]?.zscore !== undefined) {
+        zScoreSum += regionResults[region].zscore;
+        zScoreCount++;
+      }
+    }
+
+    // Add subcortical structures
+    for (const region of lobeData.subcortical) {
+      if (regionVolumes[region]) {
+        totalVolume += regionVolumes[region];
+      }
+      if (regionResults?.[region]?.zscore !== undefined) {
+        zScoreSum += regionResults[region].zscore;
+        zScoreCount++;
+      }
+    }
+
+    const meanZScore = zScoreCount > 0 ? zScoreSum / zScoreCount : null;
+
+    lobarResults[lobeName] = {
+      name: lobeData.name,
+      totalVolume: totalVolume,
+      meanZScore: meanZScore,
+      interpretation: meanZScore !== null ?
+        (meanZScore < -2.0 ? "Significant atrophy" :
+          meanZScore < -1.5 ? "Mild atrophy" :
+            meanZScore < -1.0 ? "Low-normal" : "Normal") : "N/A"
+    };
+  }
+
+  return lobarResults;
+}
+
+/**
+ * Detect FTD-specific patterns based on asymmetry and lobar involvement
+ * @param {Object} asymmetryResults - Asymmetry metrics
+ * @param {Object} lobarResults - Lobar atrophy results
+ * @param {Object} regionResults - Regional z-scores
+ * @returns {Array} FTD pattern findings
+ */
+function detectFTDPatterns(asymmetryResults, lobarResults, regionResults) {
+  const ftdPatterns = [];
+
+  // Check for frontal predominant atrophy (bvFTD)
+  const frontalZ = lobarResults?.frontal?.meanZScore;
+  const parietalZ = lobarResults?.parietal?.meanZScore;
+  const temporalZ = lobarResults?.temporal?.meanZScore;
+
+  if (frontalZ !== null && parietalZ !== null) {
+    const frontalParietalRatio = frontalZ / (parietalZ || -0.1);
+    if (frontalZ < -1.5 && frontalParietalRatio > 1.5) {
+      ftdPatterns.push({
+        pattern: "Behavioral variant FTD (bvFTD) pattern",
+        confidence: frontalZ < -2.0 ? "High" : "Moderate",
+        indicators: ["Frontal predominant atrophy", "Relative parietal sparing"],
+        recommendation: "Consider neuropsychological evaluation for executive dysfunction"
+      });
+    }
+  }
+
+  // Check for left temporal predominance (svPPA)
+  const leftTempAsym = asymmetryResults?.regions?.hippocampus;
+  const leftAmygAsym = asymmetryResults?.regions?.amygdala;
+
+  if (leftTempAsym && leftAmygAsym) {
+    if (leftTempAsym.laterality === "Right > Left" && leftTempAsym.asymmetryIndex > 15 &&
+      temporalZ !== null && temporalZ < -1.5) {
+      ftdPatterns.push({
+        pattern: "Semantic variant PPA (svPPA) pattern",
+        confidence: leftTempAsym.asymmetryIndex > 20 ? "High" : "Moderate",
+        indicators: ["Left temporal predominance", "Temporal > hippocampal asymmetry"],
+        recommendation: "Consider language testing for semantic memory deficits"
+      });
+    }
+  }
+
+  // Check for insula involvement (nfvPPA)
+  const insulaZ = lobarResults?.insula?.meanZScore;
+  if (insulaZ !== null && insulaZ < -1.5 && frontalZ !== null && frontalZ < -1.5) {
+    ftdPatterns.push({
+      pattern: "Nonfluent variant PPA (nfvPPA) pattern",
+      confidence: insulaZ < -2.0 ? "Moderate" : "Low-Moderate",
+      indicators: ["Insula involvement", "Left frontal changes"],
+      recommendation: "Consider speech/language evaluation"
+    });
+  }
+
+  return ftdPatterns;
+}
 
 // ============================================
 // APPLICATION STATE
@@ -725,6 +1435,50 @@ function setupEventListeners() {
       nv1.volumes[1].saveToDisk("atrophy_segmentation.nii.gz");
     }
   });
+
+  // Heatmap toggle button
+  const heatmapToggle = document.getElementById("heatmapToggle");
+  if (heatmapToggle) {
+    heatmapToggle.addEventListener("click", toggleAtrophyHeatmap);
+  }
+
+  // Radiologist risk input handler
+  const radiologistInput = document.getElementById("radiologistRiskInput");
+  if (radiologistInput) {
+    radiologistInput.addEventListener("change", handleRadiologistRiskInput);
+  }
+
+  // Benchmark mode selector handler
+  const benchmarkModeSelect = document.getElementById("benchmarkMode");
+  if (benchmarkModeSelect) {
+    benchmarkModeSelect.addEventListener("change", handleBenchmarkModeChange);
+    // Initialize hint text
+    handleBenchmarkModeChange();
+  }
+
+  // Reveal AI button handler
+  const revealAiBtn = document.getElementById("revealAiBtn");
+  if (revealAiBtn) {
+    revealAiBtn.addEventListener("click", revealAiResults);
+  }
+
+  // Evaluation form submit button
+  const evalSubmitBtn = document.getElementById("evalSubmitBtn");
+  if (evalSubmitBtn) {
+    evalSubmitBtn.addEventListener("click", handleEvalSubmit);
+  }
+
+  // Proceed to manual review button (AI-First mode)
+  const proceedBtn = document.getElementById("proceedToReviewBtn");
+  if (proceedBtn) {
+    proceedBtn.addEventListener("click", handleProceedToReview);
+  }
+
+  // Comparison submit button (side-by-side modes)
+  const comparisonSubmitBtn = document.getElementById("comparisonSubmitBtn");
+  if (comparisonSubmitBtn) {
+    comparisonSubmitBtn.addEventListener("click", handleComparisonSubmit);
+  }
 }
 
 // ============================================
@@ -915,6 +1669,113 @@ async function displaySegmentation(img, modelEntry) {
   await nv1.addVolume(overlayVolume);
 }
 
+// ============================================
+// ATROPHY HEATMAP OVERLAY
+// Z-score based intensity visualization
+// ============================================
+
+let atrophyHeatmapVolume = null;
+let heatmapVisible = false;
+
+/**
+ * Generate atrophy heatmap based on regional z-scores
+ * Maps z-scores to intensity values for visualization
+ */
+async function generateAtrophyHeatmap() {
+  if (!nv1 || !nv1.volumes || !nv1.volumes[0] || !segmentationData || !analysisResults) {
+    console.warn("Cannot generate heatmap: missing data");
+    return null;
+  }
+
+  // Get colormap labels for region mapping
+  const model = inferenceModelsList[DEFAULT_MODEL_INDEX];
+  const cmapPath = model.colormapPath.replace('./', '../');
+  const response = await fetch(cmapPath);
+  const cmap = await response.json();
+  const labels = cmap["labels"];
+
+  // Create z-score lookup by label name
+  const zScoreLookup = {};
+  for (const [regionName, data] of Object.entries(analysisResults.regions)) {
+    // Use effective z-score (accounts for ventricular inversion)
+    const zscore = data.effectiveZscore !== undefined ? data.effectiveZscore : data.zscore;
+    zScoreLookup[regionName] = zscore;
+  }
+
+  // Map label indices to intensity values (0-255)
+  // More atrophy (lower z-score) = higher intensity
+  const labelToIntensity = {};
+  for (let i = 0; i < labels.length; i++) {
+    const regionName = labels[i];
+    const zscore = zScoreLookup[regionName];
+
+    if (zscore !== undefined) {
+      // Map z-score to intensity:
+      // z <= -3.0 = 255 (max intensity, severe atrophy)
+      // z >= 0 = 0 (no intensity, normal)
+      // Linear interpolation in between
+      const intensity = Math.min(255, Math.max(0, Math.round((-zscore / 3.0) * 255)));
+      labelToIntensity[i] = intensity;
+    } else {
+      labelToIntensity[i] = 0;  // Unknown regions = no intensity
+    }
+  }
+
+  // Create intensity map from segmentation
+  const heatmapData = new Uint8Array(segmentationData.length);
+  for (let i = 0; i < segmentationData.length; i++) {
+    const labelIdx = segmentationData[i];
+    heatmapData[i] = labelToIntensity[labelIdx] || 0;
+  }
+
+  // Create overlay volume for heatmap
+  const heatmap = await nv1.volumes[0].clone();
+  heatmap.zeroImage();
+  heatmap.hdr.scl_inter = 0;
+  heatmap.hdr.scl_slope = 1;
+  heatmap.img = heatmapData;
+
+  // Set atrophy-specific colormap (hot colormap: black -> red -> orange -> yellow -> white)
+  heatmap.colormap = "hot";
+  heatmap.opacity = 0.6;
+
+  return heatmap;
+}
+
+/**
+ * Toggle atrophy heatmap visibility
+ */
+async function toggleAtrophyHeatmap() {
+  if (!analysisResults || !segmentationData) {
+    console.warn("Run analysis first before enabling heatmap");
+    return;
+  }
+
+  const btn = document.getElementById("heatmapToggle");
+
+  if (heatmapVisible && atrophyHeatmapVolume) {
+    // Hide heatmap
+    try {
+      await nv1.removeVolume(atrophyHeatmapVolume);
+    } catch (e) {
+      console.warn("Could not remove heatmap volume:", e);
+    }
+    atrophyHeatmapVolume = null;
+    heatmapVisible = false;
+    if (btn) btn.textContent = "Show Atrophy Heatmap";
+  } else {
+    // Generate and show heatmap
+    updateStatus("Generating atrophy heatmap...");
+    atrophyHeatmapVolume = await generateAtrophyHeatmap();
+    if (atrophyHeatmapVolume) {
+      await nv1.addVolume(atrophyHeatmapVolume);
+      heatmapVisible = true;
+      if (btn) btn.textContent = "Hide Atrophy Heatmap";
+    }
+    updateStatus("Ready");
+  }
+}
+
 async function calculateVolumes() {
   if (!segmentationData) return;
 
@@ -1085,10 +1946,10 @@ function validateAnalysisResults(results) {
   if (totalBrain > 0) {
     // Adult brain typically 1000-1600 cm³ (1,000,000 - 1,600,000 mm³)
     if (totalBrain < 800000) {
-      warnings.push(`Total brain volume (${(totalBrain/1000).toFixed(0)} cm³) is below typical adult range.`);
+      warnings.push(`Total brain volume (${(totalBrain / 1000).toFixed(0)} cm³) is below typical adult range.`);
       flags.possibleIssues.push("brain_volume_low");
     } else if (totalBrain > 1700000) {
-      warnings.push(`Total brain volume (${(totalBrain/1000).toFixed(0)} cm³) exceeds typical adult range.`);
+      warnings.push(`Total brain volume (${(totalBrain / 1000).toFixed(0)} cm³) exceeds typical adult range.`);
       flags.possibleIssues.push("brain_volume_high");
     }
   }
@@ -1420,7 +2281,7 @@ function calculateMTAScore(volumes, hippoZscore, age) {
 
   const isAbnormal = mtaScore > ageThreshold;
   const scoreInfo = STANDARDIZED_SCALES.MTA.scores[Math.floor(mtaScore)] ||
-                    STANDARDIZED_SCALES.MTA.scores[Math.round(mtaScore)];
+    STANDARDIZED_SCALES.MTA.scores[Math.round(mtaScore)];
 
   return {
     score: mtaScore,
@@ -1771,24 +2632,24 @@ async function analyzeAtrophy() {
   // Enhanced risk calculation incorporating HOC and BPF
   // HOC is particularly sensitive for early MCI detection
   if (criticalAtrophyCount >= 2 || (hippocampusZscore !== null && hippocampusZscore < -2.5) ||
-      (hocValue && hocValue < 0.60)) {
+    (hocValue && hocValue < 0.60)) {
     analysisResults.atrophyRisk = "High";
     analysisResults.riskDescription = "Significant atrophy detected - clinical correlation strongly recommended";
   } else if (moderateAtrophyCount >= 1 || criticalAtrophyCount >= 1 ||
-             (hippocampusZscore !== null && hippocampusZscore < -2.0) ||
-             (hocValue && hocValue < 0.70)) {
+    (hippocampusZscore !== null && hippocampusZscore < -2.0) ||
+    (hocValue && hocValue < 0.70)) {
     analysisResults.atrophyRisk = "Moderate";
     analysisResults.riskDescription = "Notable atrophy present - consider neuropsychological evaluation";
   } else if (mildAtrophyCount >= 2 || (hippocampusZscore !== null && hippocampusZscore < -1.5) ||
-             (bpfZscore && bpfZscore < -1.5) ||
-             (hocValue && hocValue < 0.75)) {
+    (bpfZscore && bpfZscore < -1.5) ||
+    (hocValue && hocValue < 0.75)) {
     // HOC 0.70-0.75 indicates mild-moderate medial temporal changes
     analysisResults.atrophyRisk = "Mild";
     analysisResults.riskDescription = hocValue && hocValue < 0.75
       ? "Subtle medial temporal changes detected (HOC reduced) - neuropsychological evaluation recommended"
       : "Mild volume reductions detected - monitoring recommended";
   } else if (mildAtrophyCount >= 1 || (hippocampusZscore !== null && hippocampusZscore < -1.0) ||
-             (hocValue && hocValue < 0.80)) {
+    (hocValue && hocValue < 0.80)) {
     // HOC 0.75-0.80 indicates subtle changes
     analysisResults.atrophyRisk = "Low-Normal";
     analysisResults.riskDescription = hocValue && hocValue < 0.80
@@ -1814,6 +2675,48 @@ async function analyzeAtrophy() {
     estimatedICV,
     analysisResults.hoc?.value  // Pass HOC for pattern detection
   );
+
+  // ========================================
+  // STEP 5c: Calculate asymmetry metrics
+  // ========================================
+  analysisResults.asymmetry = calculateAsymmetryMetrics(regionVolumes);
+
+  // ========================================
+  // STEP 5d: Calculate lobar atrophy
+  // ========================================
+  analysisResults.lobarAtrophy = calculateLobarAtrophy(regionVolumes, analysisResults.regions);
+
+  // ========================================
+  // STEP 5e: Calculate global atrophy index
+  // ========================================
+  analysisResults.globalAtrophyIndex = calculateGlobalAtrophyIndex(analysisResults);
+
+  // ========================================
+  // STEP 5f: Detect FTD patterns
+  // ========================================
+  const ftdPatterns = detectFTDPatterns(
+    analysisResults.asymmetry,
+    analysisResults.lobarAtrophy,
+    analysisResults.regions
+  );
+  // Add FTD patterns to clinical patterns
+  if (ftdPatterns.length > 0) {
+    analysisResults.clinicalPatterns = [...analysisResults.clinicalPatterns, ...ftdPatterns];
+  }
+
+  // Add asymmetry findings if concerning
+  if (analysisResults.asymmetry?.concerningCount > 0) {
+    const concerningRegions = Object.entries(analysisResults.asymmetry.regions)
+      .filter(([_, data]) => data.isConcerning)
+      .map(([_, data]) => `${data.clinicalName} (${data.asymmetryIndex.toFixed(1)}%, ${data.laterality})`)
+      .join("; ");
+
+    analysisResults.findings.push({
+      severity: analysisResults.asymmetry.concerningCount > 2 ? "warning" : "info",
+      text: `Asymmetry detected: ${concerningRegions}. May be relevant for FTD evaluation.`,
+      type: "asymmetry"
+    });
+  }
 
   // Add HOC-specific findings if concerning
   if (analysisResults.hoc && analysisResults.hoc.value !== null) {
@@ -2104,8 +3007,8 @@ function displayMedicalBiomarkers() {
   if (analysisResults.hoc && analysisResults.hoc.value !== null) {
     const hoc = analysisResults.hoc;
     const hocColor = hoc.value >= 0.80 ? "#22c55e" :
-                     hoc.value >= 0.70 ? "#84cc16" :
-                     hoc.value >= 0.60 ? "#f59e0b" : "#ef4444";
+      hoc.value >= 0.70 ? "#84cc16" :
+        hoc.value >= 0.60 ? "#f59e0b" : "#ef4444";
 
     const hocSection = document.createElement("div");
     hocSection.className = "biomarker-section";
@@ -2143,8 +3046,8 @@ function displayMedicalBiomarkers() {
   if (analysisResults.bpf) {
     const bpf = analysisResults.bpf;
     const bpfColor = bpf.zscore >= -1.0 ? "#22c55e" :
-                     bpf.zscore >= -1.5 ? "#84cc16" :
-                     bpf.zscore >= -2.0 ? "#f59e0b" : "#ef4444";
+      bpf.zscore >= -1.5 ? "#84cc16" :
+        bpf.zscore >= -2.0 ? "#f59e0b" : "#ef4444";
 
     const bpfSection = document.createElement("div");
     bpfSection.className = "biomarker-section";
@@ -2272,6 +3175,14 @@ function displayMedicalBiomarkers() {
 function displayResults() {
   if (!analysisResults) return;
 
+  const mode = getBenchmarkMode();
+
+  // For radiologist-only mode, skip AI display cards and show eval form directly
+  if (mode === "radiologist-only") {
+    showEvaluationWorkflow(mode);
+    return;
+  }
+
   // Show all cards
   document.getElementById("summaryCard").style.display = "block";
   document.getElementById("regionalCard").style.display = "block";
@@ -2292,6 +3203,16 @@ function displayResults() {
   // Display Medical-Grade Biomarkers
   // ========================================
   displayMedicalBiomarkers();
+
+  // ========================================
+  // Display Dementia Risk Comparison
+  // ========================================
+  displayRiskComparison();
+
+  // ========================================
+  // Display Advanced Analysis (Asymmetry, Lobar, GAI)
+  // ========================================
+  displayAdvancedAnalysis();
 
   // Regional analysis
   const regionsContainer = document.getElementById("regionsContainer");
@@ -2368,13 +3289,117 @@ function displayResults() {
     if (existingDesc) existingDesc.remove();
     summaryCard.appendChild(riskDescEl);
   }
+
+  // Trigger evaluation workflow after AI results are displayed
+  showEvaluationWorkflow(mode);
 }
 
 function hideAnalysisCards() {
   document.getElementById("summaryCard").style.display = "none";
+  document.getElementById("riskComparisonCard").style.display = "none";
+  document.getElementById("advancedAnalysisCard").style.display = "none";
   document.getElementById("regionalCard").style.display = "none";
   document.getElementById("findingsCard").style.display = "none";
   document.getElementById("exportCard").style.display = "none";
+}
+
+/**
+ * Display Advanced Analysis card with GAI, Lobar, and Asymmetry data
+ */
+function displayAdvancedAnalysis() {
+  if (!analysisResults) return;
+
+  const card = document.getElementById("advancedAnalysisCard");
+  if (!card) return;
+
+  card.style.display = "block";
+
+  // ========================================
+  // Global Atrophy Index
+  // ========================================
+  const gai = analysisResults.globalAtrophyIndex;
+  if (gai) {
+    const gaiValue = document.getElementById("gaiValue");
+    const gaiInterp = document.getElementById("gaiInterpretation");
+
+    gaiValue.textContent = `${gai.value}/100`;
+
+    // Color code based on severity
+    const severityColors = {
+      normal: "#22c55e",
+      mild: "#f59e0b",
+      moderate: "#f97316",
+      severe: "#ef4444"
+    };
+    gaiValue.style.color = severityColors[gai.severity] || "#a1a1aa";
+    gaiInterp.textContent = gai.interpretation;
+  }
+
+  // ========================================
+  // Lobar Atrophy Grid
+  // ========================================
+  const lobarGrid = document.getElementById("lobarGrid");
+  if (lobarGrid && analysisResults.lobarAtrophy) {
+    lobarGrid.innerHTML = "";
+
+    // Show only main lobes (not cingulate/insula for brevity)
+    const mainLobes = ["frontal", "temporal", "parietal", "occipital"];
+
+    for (const lobeName of mainLobes) {
+      const lobeData = analysisResults.lobarAtrophy[lobeName];
+      if (!lobeData) continue;
+
+      const item = document.createElement("div");
+      item.className = "lobar-item";
+
+      // Determine status class
+      let statusClass = "normal";
+      if (lobeData.interpretation === "Significant atrophy") statusClass = "significant";
+      else if (lobeData.interpretation === "Mild atrophy") statusClass = "mild";
+      else if (lobeData.interpretation === "Low-normal") statusClass = "low-normal";
+
+      item.innerHTML = `
+        <div class="lobar-name">${lobeData.name.replace(" Lobe", "")}</div>
+        <div class="lobar-status ${statusClass}">${lobeData.interpretation}</div>
+      `;
+      lobarGrid.appendChild(item);
+    }
+  }
+
+  // ========================================
+  // Asymmetry Analysis
+  // ========================================
+  const asymmetryGrid = document.getElementById("asymmetryGrid");
+  const asymmetrySummary = document.getElementById("asymmetrySummary");
+
+  if (asymmetryGrid && analysisResults.asymmetry) {
+    asymmetryGrid.innerHTML = "";
+    asymmetrySummary.textContent = analysisResults.asymmetry.summary;
+
+    // Sort by asymmetry index (highest first)
+    const sortedAsymmetry = Object.entries(analysisResults.asymmetry.regions)
+      .sort((a, b) => b[1].asymmetryIndex - a[1].asymmetryIndex);
+
+    // Show top asymmetries (limit to 6 for UI brevity)
+    for (const [key, data] of sortedAsymmetry.slice(0, 6)) {
+      const item = document.createElement("div");
+      item.className = "asymmetry-item";
+
+      item.innerHTML = `
+        <span class="asymmetry-name">${data.clinicalName}</span>
+        <span class="asymmetry-value">
+          <span class="asymmetry-index" style="color: ${data.color}">${data.asymmetryIndex.toFixed(1)}%</span>
+          <span class="asymmetry-laterality">${data.laterality}</span>
+        </span>
+      `;
+      asymmetryGrid.appendChild(item);
+    }
+
+    // If no asymmetry data, show message
+    if (sortedAsymmetry.length === 0) {
+      asymmetryGrid.innerHTML = '<div class="asymmetry-item">No L/R data available (requires 104-class model)</div>';
+    }
+  }
 }
 
 function getRiskColor(risk) {
@@ -2401,6 +3426,266 @@ function getInterpretationColor(interpretation) {
 
 function truncate(str, len) {
   return str.length > len ? str.substring(0, len - 3) + "..." : str;
+}
+
+// ============================================
+// EVALUATION WORKFLOW ORCHESTRATION
+// ============================================
+
+/**
+ * Show the appropriate evaluation workflow based on the selected mode.
+ * Called after AI analysis completes (or directly for radiologist-only mode).
+ * @param {string} mode - 'ai-first' | 'radiologist-first' | 'radiologist-only'
+ */
+function showEvaluationWorkflow(mode) {
+  // Hide all evaluation cards first
+  hideEvalCards();
+
+  switch (mode) {
+    case "radiologist-only":
+      showRadiologistOnlyMode();
+      break;
+    case "ai-first":
+      showAIFirstMode();
+      break;
+    case "radiologist-first":
+      showRadiologistFirstMode();
+      break;
+  }
+}
+
+/**
+ * Hide all evaluation-specific cards
+ */
+function hideEvalCards() {
+  const ids = ["aiResultsFullCard", "radiologistEvalCard", "sideBySideCard"];
+  for (const id of ids) {
+    const el = document.getElementById(id);
+    if (el) el.style.display = "none";
+  }
+  // Clear validation errors
+  const errEls = document.querySelectorAll(".eval-validation-errors");
+  errEls.forEach(el => { el.style.display = "none"; el.innerHTML = ""; });
+}
+
+/**
+ * Mode 1: Radiologist-Only
+ * Show evaluation form immediately, no AI results
+ */
+function showRadiologistOnlyMode() {
+  const card = document.getElementById("radiologistEvalCard");
+  const modeLabel = document.getElementById("evalModeLabel");
+  if (modeLabel) modeLabel.textContent = "Radiologist-Only Mode";
+
+  buildEvaluationForm("evalFormContainer");
+  if (card) card.style.display = "block";
+
+  // Make sure the eval card scrolls into view
+  card?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+/**
+ * Mode 2: AI-First
+ * Screen 1: Show AI results full display with "Proceed to Manual Review" button
+ */
+function showAIFirstMode() {
+  const aiData = extractAIScores(analysisResults);
+  if (!aiData) return;
+
+  // Store for later use in side-by-side
+  analysisResults._extractedAIData = aiData;
+
+  // Build AI results display
+  buildAIResultsDisplay("aiResultsFullContainer", aiData);
+
+  // Show the AI results card
+  const card = document.getElementById("aiResultsFullCard");
+  if (card) card.style.display = "block";
+  card?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+/**
+ * AI-First Mode: Handle "Proceed to Manual Review" button click
+ * Transitions to Screen 2: Side-by-side comparison
+ */
+function handleProceedToReview() {
+  const aiData = analysisResults?._extractedAIData || extractAIScores(analysisResults);
+
+  // Hide AI results full card
+  const aiCard = document.getElementById("aiResultsFullCard");
+  if (aiCard) aiCard.style.display = "none";
+
+  // Show side-by-side: AI (left, read-only) | Radiologist form (right, editable)
+  const compCard = document.getElementById("sideBySideCard");
+  const compLabel = document.getElementById("comparisonModeLabel");
+  if (compLabel) compLabel.textContent = "AI-First Mode — Review & Score";
+
+  buildSideBySideView(
+    "sideBySideContainer",
+    aiData,   // left column data
+    null,     // right column data (empty form)
+    "AI Analysis",
+    "Your Assessment",
+    { leftEditable: false, rightEditable: true }
+  );
+
+  if (compCard) compCard.style.display = "block";
+  compCard?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+/**
+ * Mode 3: Radiologist-First
+ * Screen 1: Show evaluation form first (no AI results visible)
+ */
+function showRadiologistFirstMode() {
+  const card = document.getElementById("radiologistEvalCard");
+  const modeLabel = document.getElementById("evalModeLabel");
+  if (modeLabel) modeLabel.textContent = "Radiologist-First Mode — Score Before AI";
+
+  buildEvaluationForm("evalFormContainer");
+  if (card) card.style.display = "block";
+  card?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+/**
+ * Handle evaluation form submit button click.
+ * Behavior depends on the current benchmark mode.
+ */
+function handleEvalSubmit() {
+  const mode = getBenchmarkMode();
+  const formData = collectFormData();
+  const validation = validateForm(formData);
+
+  if (!validation.valid) {
+    showValidationErrors("evalErrors", validation.errors);
+    return;
+  }
+
+  clearValidationErrors("evalErrors");
+
+  if (mode === "radiologist-only") {
+    // Direct save — no AI comparison
+    const payload = {
+      radiologist_data: formData,
+      patient: {
+        age: parseInt(document.getElementById("patientAge")?.value) || null,
+        sex: document.getElementById("patientSex")?.value || null
+      }
+    };
+    const saved = saveEvaluation("radiologist-only", payload);
+    showSuccessToast("Evaluation saved!");
+    console.log("Saved radiologist-only evaluation:", saved);
+
+  } else if (mode === "radiologist-first") {
+    // Transition to Screen 2: show side-by-side with AI results
+    const radiologistData = formData;
+    const aiData = extractAIScores(analysisResults);
+    analysisResults._extractedAIData = aiData;
+    analysisResults._radiologistFirstData = radiologistData;
+
+    // Hide the eval form card
+    const evalCard = document.getElementById("radiologistEvalCard");
+    if (evalCard) evalCard.style.display = "none";
+
+    // Show side-by-side: Radiologist (left, editable with prefill) | AI (right, read-only)
+    const compCard = document.getElementById("sideBySideCard");
+    const compLabel = document.getElementById("comparisonModeLabel");
+    if (compLabel) compLabel.textContent = "Radiologist-First Mode — Compare with AI";
+
+    buildSideBySideView(
+      "sideBySideContainer",
+      radiologistData,  // left column (editable, prefilled)
+      aiData,           // right column (AI, read-only)
+      "Your Assessment (Editable)",
+      "AI Analysis",
+      { leftEditable: true, rightEditable: false }
+    );
+
+    if (compCard) compCard.style.display = "block";
+    compCard?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+}
+
+/**
+ * Handle side-by-side comparison submit/resubmit button click.
+ * Collects the editable column data and saves the full evaluation.
+ */
+function handleComparisonSubmit() {
+  const mode = getBenchmarkMode();
+  const formData = collectFormData();
+  const validation = validateForm(formData);
+
+  if (!validation.valid) {
+    showValidationErrors("comparisonErrors", validation.errors);
+    return;
+  }
+
+  clearValidationErrors("comparisonErrors");
+
+  const aiData = analysisResults?._extractedAIData || extractAIScores(analysisResults);
+
+  let payload, saveMode;
+
+  if (mode === "ai-first") {
+    saveMode = "ai_then_radiologist";
+    payload = {
+      ai_data: aiData,
+      radiologist_data: formData,
+      patient: {
+        age: parseInt(document.getElementById("patientAge")?.value) || null,
+        sex: document.getElementById("patientSex")?.value || null
+      }
+    };
+  } else if (mode === "radiologist-first") {
+    saveMode = "radiologist_then_ai";
+    payload = {
+      radiologist_data: formData,
+      ai_data: aiData,
+      original_radiologist_data: analysisResults._radiologistFirstData || null,
+      patient: {
+        age: parseInt(document.getElementById("patientAge")?.value) || null,
+        sex: document.getElementById("patientSex")?.value || null
+      }
+    };
+  }
+
+  const saved = saveEvaluation(saveMode, payload);
+  showSuccessToast("Evaluation saved!");
+  console.log(`Saved ${saveMode} evaluation:`, saved);
+}
+
+/**
+ * Show validation errors in the specified container
+ */
+function showValidationErrors(containerId, errors) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  container.innerHTML = `<ul>${errors.map(e => `<li>${e}</li>`).join("")}</ul>`;
+  container.style.display = "block";
+  container.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+/**
+ * Clear validation errors
+ */
+function clearValidationErrors(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  container.innerHTML = "";
+  container.style.display = "none";
+}
+
+/**
+ * Show a success toast notification
+ */
+function showSuccessToast(message) {
+  const toast = document.createElement("div");
+  toast.className = "eval-success-toast";
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  setTimeout(() => {
+    toast.remove();
+  }, 3000);
 }
 
 // ============================================
@@ -2484,6 +3769,29 @@ Interpretation:         ${r.hoc.interpretation}
 Clinical Note:          ${r.hoc.description}
 MCI→AD Conversion Risk: ${r.hoc.conversionRisk} (${r.hoc.conversionRate})
 `;
+  }
+
+  // Dementia Risk Scoring
+  if (r.dementiaRiskScore) {
+    report += `
+DEMENTIA RISK SCORING
+---------------------
+AI Risk Score:          ${r.dementiaRiskScore.score}/5 (${r.dementiaRiskScore.label})
+Confidence:             ${r.dementiaRiskScore.confidence}
+`;
+    if (r.dementiaRiskScore.factors && r.dementiaRiskScore.factors.length > 0) {
+      report += `Contributing Factors:\n`;
+      for (const factor of r.dementiaRiskScore.factors) {
+        report += `  - ${factor}\n`;
+      }
+    }
+    if (r.radiologistRiskScore !== undefined) {
+      report += `Radiologist Score:      ${r.radiologistRiskScore}/5 (${RISK_SCORE_LABELS[r.radiologistRiskScore]})\n`;
+      const discrepancy = Math.abs(r.dementiaRiskScore.score - r.radiologistRiskScore);
+      if (discrepancy >= 2) {
+        report += `*** DISCREPANCY NOTE: AI and radiologist scores differ by ${discrepancy} points ***\n`;
+      }
+    }
   }
 
   // Hippocampus-specific analysis

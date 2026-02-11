@@ -1,10 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cognify - AI-Powered Brain Analysis</title>
-  <meta name="description" content="Medical-grade brain volumetric analysis for early detection of Alzheimer's disease and neurodegeneration. AI-powered MRI analysis.">
+  <title>Cognify - Brain MRI Analysis Tool</title>
+  <meta name="description" content="Experimental brain volumetric analysis tool for MRI scans. Research prototype.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -12,13 +13,14 @@
   <!-- Pako for decompression (used for server-side inference) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
 </head>
+
 <body>
   <div class="app-container">
     <!-- Header -->
     <header class="header">
       <div class="header-left">
         <h1 class="logo">Cognify</h1>
-        <span class="badge">Medical-Grade AI</span>
+        <span class="badge">Research Prototype</span>
       </div>
       <div class="header-right">
         <div class="progress-container" id="progressContainer">
@@ -52,9 +54,9 @@
           <div class="drop-zone" id="dropZone">
             <div class="drop-content">
               <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                <polyline points="17 8 12 3 7 8"/>
-                <line x1="12" y1="3" x2="12" y2="15"/>
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="17 8 12 3 7 8" />
+                <line x1="12" y1="3" x2="12" y2="15" />
               </svg>
               <p class="drop-text">Drag & Drop NIfTI file</p>
               <p class="drop-subtext">or click to browse</p>
@@ -73,8 +75,8 @@
           <h2>Atrophy Analysis</h2>
           <button class="btn btn-primary" id="analyzeBtn" disabled>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
-              <circle cx="12" cy="12" r="10"/>
-              <path d="M12 6v6l4 2"/>
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 6v6l4 2" />
             </svg>
             Analyze
           </button>
@@ -96,12 +98,25 @@
               </select>
             </div>
           </div>
+
+          <!-- Benchmark Mode Selector -->
+          <div class="benchmark-mode-section">
+            <label class="benchmark-label">Evaluation Mode</label>
+            <select id="benchmarkMode" class="benchmark-select">
+              <option value="ai-first">AI-First (AI → Review)</option>
+              <option value="radiologist-first">Radiologist-First (Manual → AI)</option>
+              <option value="radiologist-only">Radiologist-Only (No AI)</option>
+            </select>
+            <p class="benchmark-hint" id="benchmarkHint">AI results shown first, then manual review</p>
+          </div>
+
           <div class="sample-download">
-            <a href="/sample-mri/my_output_file.nii.gz" download="sample-mri.nii.gz" class="btn btn-secondary btn-sample">
+            <a href="/sample-mri/my_output_file.nii.gz" download="sample-mri.nii.gz"
+              class="btn btn-secondary btn-sample">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                <polyline points="7 10 12 15 17 10"/>
-                <line x1="12" y1="15" x2="12" y2="3"/>
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
               </svg>
               Download Sample MRI
             </a>
@@ -127,6 +142,117 @@
           </div>
         </div>
 
+        <!-- Dementia Risk Comparison Card -->
+        <div class="card" id="riskComparisonCard" style="display:none;">
+          <h3 class="card-title">
+            Atrophy Assessment
+            <span class="card-subtitle" id="assessmentModeLabel">Experimental Analysis</span>
+          </h3>
+          <div class="risk-comparison-grid">
+            <!-- AI Column (hidden in radiologist-first until revealed) -->
+            <div class="risk-column" id="aiResultsColumn">
+              <span class="risk-source">Model Output</span>
+              <span class="risk-score-value" id="aiRiskScore">--</span>
+              <span class="risk-label" id="aiRiskLabel">--</span>
+              <div class="risk-factors" id="aiRiskFactors"></div>
+            </div>
+            <!-- AI Hidden Placeholder (shown in radiologist-first mode) -->
+            <div class="risk-column ai-hidden-placeholder" id="aiHiddenPlaceholder" style="display:none;">
+              <span class="risk-source">Model Output</span>
+              <span class="risk-score-value hidden-score">?</span>
+              <span class="risk-label">Hidden until manual assessment</span>
+            </div>
+            <!-- Radiologist Column -->
+            <div class="risk-column radiologist" id="radiologistColumn">
+              <span class="risk-source">Manual Assessment</span>
+              <select id="radiologistRiskInput" class="risk-select">
+                <option value="">Select score...</option>
+                <option value="0">0 - No Risk</option>
+                <option value="1">1 - Minimal Risk</option>
+                <option value="2">2 - Low Risk</option>
+                <option value="3">3 - Moderate Risk</option>
+                <option value="4">4 - High Risk</option>
+                <option value="5">5 - Very High Risk</option>
+              </select>
+              <span class="risk-label" id="radiologistRiskLabel">&nbsp;</span>
+            </div>
+          </div>
+          <!-- Reveal AI Button (shown only in radiologist-first mode after score entered) -->
+          <div class="reveal-ai-section" id="revealAiSection" style="display:none;">
+            <button class="btn btn-primary" id="revealAiBtn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+              Reveal AI Results
+            </button>
+            <p class="reveal-hint">You can modify your score after viewing AI results</p>
+          </div>
+          <div class="discrepancy-alert" id="discrepancyAlert" style="display:none;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="alert-icon">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+              <line x1="12" y1="9" x2="12" y2="13" />
+              <line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+            <span id="discrepancyText">Discrepancy noted between model and manual assessments</span>
+          </div>
+        </div>
+
+        <!-- AI Results Full Display (AI-First Mode Screen 1) -->
+        <div class="card" id="aiResultsFullCard" style="display:none;">
+          <h3 class="card-title">
+            AI Analysis Results
+            <span class="card-subtitle">Complete AI-generated scores</span>
+          </h3>
+          <div id="aiResultsFullContainer"></div>
+          <div class="eval-actions">
+            <button class="btn btn-primary eval-proceed-btn" id="proceedToReviewBtn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
+                <path d="M5 12h14M12 5l7 7-7 7" />
+              </svg>
+              Proceed to Manual Review
+            </button>
+          </div>
+        </div>
+
+        <!-- Radiologist Evaluation Form -->
+        <div class="card" id="radiologistEvalCard" style="display:none;">
+          <h3 class="card-title">
+            Radiologist Evaluation
+            <span class="card-subtitle" id="evalModeLabel">Manual Assessment</span>
+          </h3>
+          <div id="evalFormContainer"></div>
+          <div class="eval-validation-errors" id="evalErrors" style="display:none;"></div>
+          <div class="eval-actions">
+            <button class="btn btn-primary eval-submit-btn" id="evalSubmitBtn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+              Submit Evaluation
+            </button>
+          </div>
+        </div>
+
+        <!-- Side-by-Side Comparison (Modes 2 & 3) -->
+        <div class="card eval-comparison-card" id="sideBySideCard" style="display:none;">
+          <h3 class="card-title">
+            Side-by-Side Comparison
+            <span class="card-subtitle" id="comparisonModeLabel"></span>
+          </h3>
+          <div id="sideBySideContainer"></div>
+          <div class="eval-validation-errors" id="comparisonErrors" style="display:none;"></div>
+          <div class="eval-actions">
+            <button class="btn btn-primary eval-submit-btn" id="comparisonSubmitBtn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+              Submit Final Evaluation
+            </button>
+          </div>
+        </div>
+
         <!-- Regional Analysis -->
         <div class="card" id="regionalCard" style="display:none;">
           <h3 class="card-title">
@@ -135,6 +261,46 @@
           </h3>
           <div class="regions-container" id="regionsContainer">
             <!-- Dynamically populated -->
+          </div>
+        </div>
+
+        <!-- Advanced Analysis (Phase 2) -->
+        <div class="card" id="advancedAnalysisCard" style="display:none;">
+          <h3 class="card-title">
+            Advanced Analysis
+            <span class="card-subtitle">Asymmetry & Lobar Tracking</span>
+          </h3>
+
+          <!-- Global Atrophy Index -->
+          <div class="biomarker-section" id="globalAtrophySection">
+            <div class="biomarker-header">
+              <span class="biomarker-name">Global Atrophy Index</span>
+              <span class="biomarker-value" id="gaiValue">--</span>
+            </div>
+            <div class="biomarker-details">
+              <span id="gaiInterpretation">--</span>
+            </div>
+          </div>
+
+          <!-- Lobar Atrophy Summary -->
+          <div class="biomarker-section" id="lobarAtrophySection">
+            <div class="biomarker-header">
+              <span class="biomarker-name">Lobar Atrophy</span>
+            </div>
+            <div class="lobar-grid" id="lobarGrid">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+
+          <!-- Asymmetry Analysis -->
+          <div class="biomarker-section" id="asymmetrySection">
+            <div class="biomarker-header">
+              <span class="biomarker-name">L/R Asymmetry</span>
+              <span class="biomarker-value" id="asymmetrySummary">--</span>
+            </div>
+            <div class="asymmetry-grid" id="asymmetryGrid">
+              <!-- Dynamically populated -->
+            </div>
           </div>
         </div>
 
@@ -148,22 +314,29 @@
 
         <!-- Export -->
         <div class="card" id="exportCard" style="display:none;">
-          <h3 class="card-title">Export</h3>
+          <h3 class="card-title">Export & Visualization</h3>
           <div class="export-buttons">
+            <button class="btn btn-secondary" id="heatmapToggle">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
+                <path
+                  d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83" />
+              </svg>
+              Show Atrophy Heatmap
+            </button>
             <button class="btn btn-secondary" id="exportPdfBtn">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                <polyline points="14 2 14 8 20 8"/>
-                <line x1="16" y1="13" x2="8" y2="13"/>
-                <line x1="16" y1="17" x2="8" y2="17"/>
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
               </svg>
               Export Report
             </button>
             <button class="btn btn-secondary" id="exportNiftiBtn">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                <polyline points="7 10 12 15 17 10"/>
-                <line x1="12" y1="15" x2="12" y2="3"/>
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
               </svg>
               Save Segmentation
             </button>
@@ -175,4 +348,5 @@
 
   <script type="module" src="main.js"></script>
 </body>
+
 </html>

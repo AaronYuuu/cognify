@@ -1,6 +1,6 @@
 /* ============================================
    BRAIN ATROPHY ANALYSIS - STYLES
-   Modern Clinical Interface
+   Research Interface
    ============================================ */
 
 :root {
@@ -29,9 +29,9 @@
   --radius-md: 8px;
   --radius-lg: 12px;
 
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
-  --shadow-md: 0 4px 6px rgba(0,0,0,0.4);
-  --shadow-lg: 0 10px 15px rgba(0,0,0,0.5);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5);
 
   --transition: 150ms ease;
 }
@@ -89,9 +89,9 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 4px 8px;
-  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
-  border-radius: 9999px;
-  color: white;
+  background: var(--text-muted);
+  border-radius: 4px;
+  color: var(--bg-primary);
 }
 
 .header-right {
@@ -208,13 +208,13 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0,0,0,0.8);
+  background: rgba(0, 0, 0, 0.8);
   cursor: pointer;
   transition: var(--transition);
 }
 
 .drop-zone:hover {
-  background: rgba(0,0,0,0.7);
+  background: rgba(0, 0, 0, 0.7);
 }
 
 .drop-zone.hidden {
@@ -354,6 +354,74 @@ body {
   justify-content: center;
 }
 
+/* Benchmark Mode Selector */
+.benchmark-mode-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.benchmark-label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.benchmark-select {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.benchmark-select:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
+.benchmark-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 6px;
+  font-style: italic;
+}
+
+/* AI Hidden Placeholder */
+.ai-hidden-placeholder {
+  background: var(--bg-primary);
+  border: 1px dashed var(--border-light);
+}
+
+.hidden-score {
+  color: var(--text-muted);
+  font-size: 28px;
+}
+
+/* Reveal AI Section */
+.reveal-ai-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  text-align: center;
+}
+
+.reveal-ai-section .btn {
+  width: 100%;
+  justify-content: center;
+}
+
+.reveal-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 8px;
+  font-style: italic;
+}
+
 /* Summary Grid */
 .summary-grid {
   display: grid;
@@ -434,11 +502,30 @@ body {
 }
 
 /* Z-score color classes - applied dynamically via inline styles for precise control */
-.region-zscore.normal { background: rgba(34, 197, 94, 0.2); color: var(--success); }
-.region-zscore.low-normal { background: rgba(132, 204, 22, 0.2); color: #84cc16; }
-.region-zscore.mild { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
-.region-zscore.moderate { background: rgba(249, 115, 22, 0.2); color: #f97316; }
-.region-zscore.severe { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+.region-zscore.normal {
+  background: rgba(34, 197, 94, 0.2);
+  color: var(--success);
+}
+
+.region-zscore.low-normal {
+  background: rgba(132, 204, 22, 0.2);
+  color: #84cc16;
+}
+
+.region-zscore.mild {
+  background: rgba(245, 158, 11, 0.2);
+  color: var(--warning);
+}
+
+.region-zscore.moderate {
+  background: rgba(249, 115, 22, 0.2);
+  color: #f97316;
+}
+
+.region-zscore.severe {
+  background: rgba(239, 68, 68, 0.2);
+  color: var(--danger);
+}
 
 /* ============================================
    MEDICAL-GRADE BIOMARKERS SECTION
@@ -589,10 +676,21 @@ body {
   flex-shrink: 0;
 }
 
-.finding-icon.warning { color: var(--warning); }
-.finding-icon.danger { color: var(--danger); }
-.finding-icon.info { color: var(--info); }
-.finding-icon.success { color: var(--success); }
+.finding-icon.warning {
+  color: var(--warning);
+}
+
+.finding-icon.danger {
+  color: var(--danger);
+}
+
+.finding-icon.info {
+  color: var(--info);
+}
+
+.finding-icon.success {
+  color: var(--success);
+}
 
 /* Export */
 .export-buttons {
@@ -649,11 +747,25 @@ body {
   margin-bottom: 4px;
 }
 
-.scale-value.normal { color: var(--success); }
-.scale-value.mild { color: #84cc16; }
-.scale-value.moderate { color: var(--warning); }
-.scale-value.severe { color: #f97316; }
-.scale-value.critical { color: var(--danger); }
+.scale-value.normal {
+  color: var(--success);
+}
+
+.scale-value.mild {
+  color: #84cc16;
+}
+
+.scale-value.moderate {
+  color: var(--warning);
+}
+
+.scale-value.severe {
+  color: #f97316;
+}
+
+.scale-value.critical {
+  color: var(--danger);
+}
 
 .scale-label {
   font-size: 12px;
@@ -764,11 +876,13 @@ body {
 }
 
 .evans-marker.threshold-normal {
-  left: 71.4%; /* 0.25/0.35 */
+  left: 71.4%;
+  /* 0.25/0.35 */
 }
 
 .evans-marker.threshold-abnormal {
-  left: 85.7%; /* 0.30/0.35 */
+  left: 85.7%;
+  /* 0.30/0.35 */
 }
 
 /* ============================================
@@ -846,8 +960,15 @@ body {
    ============================================ */
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
 }
 
 .analyzing .progress-fill {
@@ -871,5 +992,528 @@ body {
 
   .analysis-panel {
     width: 100%;
+  }
+}
+
+/* ============================================
+   DEMENTIA RISK COMPARISON
+   ============================================ */
+
+.risk-comparison-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.risk-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 16px 12px;
+  background: var(--bg-primary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+}
+
+.risk-column.radiologist {
+  border-color: var(--accent-primary);
+  background: rgba(99, 102, 241, 0.05);
+}
+
+.risk-source {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+}
+
+.risk-score-value {
+  font-size: 36px;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+
+.risk-score-value.risk-0 {
+  color: var(--success);
+}
+
+.risk-score-value.risk-1 {
+  color: #22d3ee;
+}
+
+.risk-score-value.risk-2 {
+  color: #84cc16;
+}
+
+.risk-score-value.risk-3 {
+  color: var(--warning);
+}
+
+.risk-score-value.risk-4 {
+  color: #f97316;
+}
+
+.risk-score-value.risk-5 {
+  color: var(--danger);
+}
+
+.risk-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  min-height: 18px;
+}
+
+.risk-select {
+  width: 100%;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.risk-select:hover {
+  border-color: var(--accent-primary);
+}
+
+.risk-select:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+}
+
+.risk-factors {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 8px;
+  text-align: left;
+  width: 100%;
+}
+
+.risk-factor-item {
+  padding: 2px 0;
+}
+
+.discrepancy-alert {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: var(--radius-sm);
+  color: var(--warning);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.discrepancy-alert .alert-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.discrepancy-alert.hidden {
+  display: none;
+}
+
+/* ============================================
+   LOBAR & ASYMMETRY GRIDS
+   ============================================ */
+
+.lobar-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.lobar-item {
+  padding: 8px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+  text-align: center;
+}
+
+.lobar-name {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.lobar-status {
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.lobar-status.normal {
+  color: var(--success);
+}
+
+.lobar-status.low-normal {
+  color: #84cc16;
+}
+
+.lobar-status.mild {
+  color: var(--warning);
+}
+
+.lobar-status.significant {
+  color: var(--danger);
+}
+
+.asymmetry-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.asymmetry-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+}
+
+.asymmetry-name {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.asymmetry-value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.asymmetry-index {
+  font-weight: 600;
+}
+
+.asymmetry-laterality {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* ============================================
+   RADIOLOGIST EVALUATION FORM
+   ============================================ */
+
+.eval-form {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.eval-section {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.eval-section:last-child {
+  border-bottom: none;
+}
+
+.eval-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.eval-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.eval-grid-single {
+  grid-template-columns: 1fr;
+  max-width: 200px;
+}
+
+.eval-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.eval-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  line-height: 1.3;
+  cursor: pointer;
+}
+
+.eval-label-abbr {
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.eval-label-full {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.eval-input,
+.eval-dropdown {
+  padding: 7px 10px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: inherit;
+  transition: var(--transition);
+}
+
+.eval-input:focus,
+.eval-dropdown:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
+}
+
+.eval-input:disabled,
+.eval-dropdown:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.eval-region-group {
+  margin-top: 8px;
+  margin-bottom: 4px;
+}
+
+.eval-group-label {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent-primary);
+  margin-bottom: 8px;
+  padding: 2px 8px;
+  background: rgba(99, 102, 241, 0.1);
+  border-radius: var(--radius-sm);
+}
+
+.eval-actions {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.eval-submit-btn,
+.eval-proceed-btn {
+  width: 100%;
+  justify-content: center;
+  padding: 10px 16px;
+  font-size: 13px;
+}
+
+.eval-validation-errors {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: var(--radius-sm);
+  color: var(--danger);
+  font-size: 11px;
+  line-height: 1.5;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.eval-validation-errors ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.eval-validation-errors li {
+  padding: 2px 0;
+}
+
+.eval-validation-errors li::before {
+  content: "• ";
+  color: var(--danger);
+}
+
+/* ============================================
+   AI RESULTS DISPLAY (read-only)
+   ============================================ */
+
+.eval-results-display {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.eval-ai-badge {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 6px;
+  background: rgba(59, 130, 246, 0.2);
+  color: var(--accent-secondary);
+  border-radius: 9999px;
+}
+
+.eval-results-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.eval-result-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  background: var(--bg-primary);
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+}
+
+.eval-result-label {
+  color: var(--text-secondary);
+  font-weight: 500;
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.eval-result-value {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.eval-atrophy-none {
+  color: var(--success);
+}
+
+.eval-atrophy-mild {
+  color: var(--warning);
+}
+
+.eval-atrophy-moderate {
+  color: #f97316;
+}
+
+.eval-atrophy-high {
+  color: var(--danger);
+}
+
+/* ============================================
+   SIDE-BY-SIDE COMPARISON
+   ============================================ */
+
+/* Side-by-side comparison card has no overrides — uses .card defaults */
+
+.side-by-side-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.side-by-side-column {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.side-by-side-header {
+  padding: 10px 12px;
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border);
+}
+
+.side-by-side-header h4 {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.side-by-side-body {
+  padding: 8px;
+  max-height: 550px;
+  overflow-y: auto;
+}
+
+/* Evaluation success toast */
+.eval-success-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  padding: 14px 20px;
+  background: var(--success);
+  color: #fff;
+  font-weight: 600;
+  font-size: 13px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  z-index: 1000;
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* ============================================
+   RESPONSIVE - EVALUATION
+   ============================================ */
+
+@media (max-width: 1024px) {
+  .side-by-side-container {
+    grid-template-columns: 1fr;
+  }
+
+  .eval-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .eval-results-grid {
+    grid-template-columns: 1fr;
   }
 }
