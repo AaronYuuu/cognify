@@ -223,7 +223,7 @@ export function buildAIResultsDisplay(containerId, aiData) {
     // Global Scores
     html += `
     <div class="eval-section">
-      <h4 class="eval-section-title">Global Clinical Scores <span class="eval-ai-badge">AI</span></h4>
+      <h4 class="eval-section-title">Global Clinical Scores</h4>
       <div class="eval-results-grid">`;
 
     for (const score of GLOBAL_SCORES) {
@@ -243,7 +243,7 @@ export function buildAIResultsDisplay(containerId, aiData) {
     // Lobar Atrophy
     html += `
     <div class="eval-section">
-      <h4 class="eval-section-title">Lobar Atrophy <span class="eval-ai-badge">AI</span></h4>
+      <h4 class="eval-section-title">Lobar Atrophy</h4>
       <div class="eval-results-grid">`;
 
     for (const lobe of LOBES) {
@@ -269,7 +269,7 @@ export function buildAIResultsDisplay(containerId, aiData) {
 
     html += `
     <div class="eval-section">
-      <h4 class="eval-section-title">Regional Atrophy <span class="eval-ai-badge">AI</span></h4>`;
+      <h4 class="eval-section-title">Regional Atrophy</h4>`;
 
     for (const [groupName, regions] of Object.entries(groups)) {
         html += `

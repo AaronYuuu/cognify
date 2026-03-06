@@ -286,11 +286,18 @@ body {
    ============================================ */
 
 .analysis-panel {
-  width: 420px;
+  width: 560px;
+  min-width: 560px;
   display: flex;
   flex-direction: column;
   background: var(--bg-secondary);
   overflow-y: auto;
+}
+
+/* Extra width when comparison view is shown so both columns have room */
+.analysis-panel.comparison-active {
+  width: 680px;
+  min-width: 680px;
 }
 
 .panel-header {
@@ -1038,8 +1045,10 @@ body {
     min-height: 50vh;
   }
 
-  .analysis-panel {
+  .analysis-panel,
+  .analysis-panel.comparison-active {
     width: 100%;
+    min-width: 0;
   }
 }
 
@@ -1346,7 +1355,7 @@ body {
 
 .eval-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 10px;
 }
 
@@ -1369,6 +1378,9 @@ body {
   gap: 1px;
   line-height: 1.3;
   cursor: pointer;
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .eval-label-abbr {
@@ -1392,6 +1404,9 @@ body {
   font-size: 12px;
   font-family: inherit;
   transition: var(--transition);
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .eval-input:focus,
@@ -1490,7 +1505,7 @@ body {
 
 .eval-results-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 8px;
 }
 
@@ -1504,6 +1519,7 @@ body {
   font-size: 11px;
   gap: 8px;
   min-height: 32px;
+  min-width: 0;
 }
 
 .eval-result-label {
@@ -1511,9 +1527,9 @@ body {
   font-weight: 500;
   flex: 1;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.3;
 }
 
 .eval-result-value {
@@ -1542,12 +1558,20 @@ body {
    SIDE-BY-SIDE COMPARISON
    ============================================ */
 
-/* Side-by-side comparison card has no overrides — uses .card defaults */
+.eval-comparison-card.card {
+  margin: 12px;
+  padding: 12px;
+}
+
+.eval-comparison-card .card-title {
+  margin-bottom: 10px;
+  font-size: 12px;
+}
 
 .side-by-side-container {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  gap: 20px;
   min-height: 0;
 }
 
@@ -1558,27 +1582,25 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  max-height: 580px;
+  min-width: 200px;
+  max-height: 72vh;
 }
 
 .side-by-side-header {
-  padding: 10px 12px;
+  padding: 8px 12px;
   background: var(--bg-primary);
   border-bottom: 1px solid var(--border);
-}
-
-.side-by-side-header {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 .side-by-side-header h4 {
   font-size: 12px;
   font-weight: 600;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
+  color: var(--text-primary);
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 .side-by-side-subtitle {
@@ -1589,16 +1611,60 @@ body {
 }
 
 .side-by-side-column.side-by-side-editable {
-  border-color: rgba(99, 102, 241, 0.4);
-  background: rgba(99, 102, 241, 0.04);
+  border-color: rgba(99, 102, 241, 0.35);
+  background: rgba(99, 102, 241, 0.03);
 }
 
 .side-by-side-body {
-  padding: 10px;
+  padding: 12px;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
+}
+
+/* Less clutter inside comparison columns */
+.eval-comparison-card .eval-section {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.eval-comparison-card .eval-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--text-secondary);
+}
+
+.eval-comparison-card .eval-results-grid,
+.eval-comparison-card .eval-grid {
+  gap: 6px;
+}
+
+.eval-comparison-card .eval-result-item,
+.eval-comparison-card .eval-field {
+  min-height: 28px;
+}
+
+.eval-comparison-card .eval-result-item {
+  padding: 5px 8px;
+  font-size: 11px;
+}
+
+.eval-comparison-card .eval-group-label {
+  font-size: 9px;
+  padding: 2px 6px;
+  margin-bottom: 6px;
+}
+
+.eval-comparison-card .eval-region-group {
+  margin-top: 6px;
+  margin-bottom: 2px;
+}
+
+.eval-comparison-card .eval-actions {
+  margin-top: 12px;
+  padding-top: 10px;
 }
 
 .eval-proceed-hint {

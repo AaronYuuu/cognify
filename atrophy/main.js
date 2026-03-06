@@ -3411,6 +3411,7 @@ function hideEvalCards() {
     const el = document.getElementById(id);
     if (el) el.style.display = "none";
   }
+  document.getElementById("appContainer")?.querySelector(".analysis-panel")?.classList.remove("comparison-active");
   // Clear validation errors
   const errEls = document.querySelectorAll(".eval-validation-errors");
   errEls.forEach(el => { el.style.display = "none"; el.innerHTML = ""; });
@@ -3478,6 +3479,7 @@ function handleProceedToReview() {
   );
 
   if (compCard) compCard.style.display = "block";
+  document.querySelector(".analysis-panel")?.classList.add("comparison-active");
   compCard?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
@@ -3550,6 +3552,7 @@ function handleEvalSubmit() {
     );
 
     if (compCard) compCard.style.display = "block";
+    document.querySelector(".analysis-panel")?.classList.add("comparison-active");
     compCard?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 }
