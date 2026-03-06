@@ -226,6 +226,31 @@ body {
   border: 2px dashed var(--accent-primary);
 }
 
+/* Landing: only show load-MRI screen */
+.app-container.landing .header,
+.app-container.landing .analysis-panel,
+.app-container.landing .viewer-header,
+.app-container.landing .viewer-footer {
+  display: none;
+}
+
+.app-container.landing .viewer-section {
+  border-right: none;
+}
+
+.drop-app-title {
+  display: none;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin-bottom: 24px;
+  color: var(--text-primary);
+}
+
+.app-container.landing .drop-app-title {
+  display: block;
+}
+
 .drop-content {
   text-align: center;
 }
@@ -1148,6 +1173,56 @@ body {
 
 .discrepancy-alert.hidden {
   display: none;
+}
+
+/* ============================================
+   ADVANCED ANALYSIS CARD
+   ============================================ */
+
+.advanced-analysis-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.advanced-section {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
+}
+
+.advanced-section:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.advanced-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin: 0 0 8px 0;
+}
+
+.gai-display {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gai-value {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.gai-interpretation {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.asymmetry-summary {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 0 0 6px 0;
 }
 
 /* ============================================

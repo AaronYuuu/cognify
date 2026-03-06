@@ -820,6 +820,7 @@ function handleBenchmarkModeChange() {
  */
 function handleRadiologistRiskInput() {
   const radiologistInput = document.getElementById("radiologistRiskInput");
+  if (!radiologistInput) return;
   const radiologistScore = radiologistInput.value;
   const radiologistLabel = document.getElementById("radiologistRiskLabel");
   const discrepancyAlert = document.getElementById("discrepancyAlert");
@@ -896,104 +897,6 @@ function revealAiResults() {
 
   // Now check for discrepancy since AI is visible
   handleRadiologistRiskInput();
-}
-
-/**
- * Display the risk comparison card with AI and radiologist scores
- * Respects the selected benchmark mode for show/hide logic
- */
-function displayRiskComparison() {
-  if (!analysisResults) return;
-
-  const card = document.getElementById("riskComparisonCard");
-  if (!card) return;
-
-  // Get current benchmark mode
-  const mode = getBenchmarkMode();
-  analysisResults.benchmarkMode = mode;
-  analysisResults.analysisTimestamp = new Date().toISOString();
-
-  // Calculate AI dementia risk score (always calculate, but may hide display)
-  const riskResult = calculateDementiaRiskScore(analysisResults);
-  analysisResults.dementiaRiskScore = riskResult;
-
-  // Display the card
-  card.style.display = "block";
-
-  // Get UI elements
-  const aiColumn = document.getElementById("aiResultsColumn");
-  const aiPlaceholder = document.getElementById("aiHiddenPlaceholder");
-  const radiologistColumn = document.getElementById("radiologistColumn");
-  const revealSection = document.getElementById("revealAiSection");
-  const modeLabel = document.getElementById("assessmentModeLabel");
-  const aiScoreEl = document.getElementById("aiRiskScore");
-  const aiLabelEl = document.getElementById("aiRiskLabel");
-  const aiFactorsEl = document.getElementById("aiRiskFactors");
-
-  // Update AI score display (populate values regardless of visibility)
-  if (riskResult.score !== null) {
-    aiScoreEl.textContent = riskResult.score;
-    aiScoreEl.className = `risk-score-value risk-${riskResult.score}`;
-    aiLabelEl.textContent = riskResult.label;
-
-    // Display contributing factors
-    if (riskResult.factors.length > 0) {
-      aiFactorsEl.innerHTML = riskResult.factors.map(f =>
-        `<div class="risk-factor-item">• ${f}</div>`
-      ).join("");
-    } else {
-      aiFactorsEl.innerHTML = '<div class="risk-factor-item">• No concerning findings</div>';
-    }
-  } else {
-    aiScoreEl.textContent = "--";
-    aiScoreEl.className = "risk-score-value";
-    aiLabelEl.textContent = "Unable to calculate";
-    aiFactorsEl.innerHTML = "";
-  }
-
-  // Apply benchmark mode visibility
-  switch (mode) {
-    case "ai-first":
-      // Show AI results immediately
-      if (aiColumn) aiColumn.style.display = "block";
-      if (aiPlaceholder) aiPlaceholder.style.display = "none";
-      if (radiologistColumn) radiologistColumn.style.display = "block";
-      if (revealSection) revealSection.style.display = "none";
-      if (modeLabel) modeLabel.textContent = "AI-First Mode";
-      break;
-
-    case "radiologist-first":
-      // Hide AI results until radiologist enters score and clicks reveal
-      if (aiColumn) aiColumn.style.display = "none";
-      if (aiPlaceholder) aiPlaceholder.style.display = "block";
-      if (radiologistColumn) radiologistColumn.style.display = "block";
-      if (revealSection) revealSection.style.display = "none"; // Shown after score entry
-      if (modeLabel) modeLabel.textContent = "Radiologist-First Mode";
-      break;
-
-    case "radiologist-only":
-      // Hide AI completely
-      if (aiColumn) aiColumn.style.display = "none";
-      if (aiPlaceholder) aiPlaceholder.style.display = "none";
-      if (radiologistColumn) radiologistColumn.style.display = "block";
-      if (revealSection) revealSection.style.display = "none";
-      if (modeLabel) modeLabel.textContent = "Radiologist-Only Mode";
-      break;
-  }
-
-  // Reset radiologist input
-  const radiologistInput = document.getElementById("radiologistRiskInput");
-  if (radiologistInput) {
-    radiologistInput.value = "";
-  }
-  const radiologistLabel = document.getElementById("radiologistRiskLabel");
-  if (radiologistLabel) {
-    radiologistLabel.innerHTML = "&nbsp;";
-  }
-  const discrepancyAlert = document.getElementById("discrepancyAlert");
-  if (discrepancyAlert) {
-    discrepancyAlert.style.display = "none";
-  }
 }
 
 // ============================================
@@ -1384,28 +1287,50 @@ let analysisResults = null;
 
 // Default model: Subcortical + GWM - robust for low quality MRIs
 const DEFAULT_MODEL_INDEX = 5;  // Subcortical + GWM (Low Mem, Faster)
+// 104-class model for L/R asymmetry (Aparc+Aseg 104, index 13)
+const BILATERAL_MODEL_INDEX = 13;
+
+/** Model index used for the current/last analysis (set at runSegmentation) */
+let lastUsedModelIndex = DEFAULT_MODEL_INDEX;
+
+/** Get active model index: 104-class when bilateral atrophy is checked, else 18-class */
+function getActiveModelIndex() {
+  const bilateralCheck = document.getElementById("bilateralAtrophyCheck");
+  return bilateralCheck?.checked ? BILATERAL_MODEL_INDEX : DEFAULT_MODEL_INDEX;
+}
 
 // ============================================
 // INITIALIZATION
 // ============================================
 
 async function init() {
+  document.getElementById("appContainer").classList.add("landing");
   console.log("Initializing Brain Atrophy Analysis...");
 
   // Initialize NiiVue
   const defaults = {
     backColor: [0.05, 0.05, 0.08, 1],
-    show3Dcrosshair: true,
+    show3Dcrosshair: false,  // no 3D view in layout
     onLocationChange: handleLocationChange,
   };
 
   nv1 = new Niivue(defaults);
   await nv1.attachToCanvas(document.getElementById("gl1"));
-  nv1.opts.dragMode = nv1.dragModes.pan;
+  // Crosshair mode so scroll wheel moves through slices (pan mode would use scroll for zoom)
+  nv1.opts.dragMode = nv1.dragModes.crosshair;
   nv1.opts.multiplanarForceRender = true;
   nv1.opts.yoke3Dto2DZoom = true;
   nv1.opts.crosshairGap = 11;
   nv1.setInterpolation(true);
+
+  // Custom layout: sagittal largest (left), coronal + axial stacked on the right (no 3D view)
+  nv1.setSliceType(nv1.sliceTypeMultiplanar);
+  // position: [left, top, width, height] normalized 0–1
+  nv1.setCustomLayout([
+    { sliceType: nv1.sliceTypeSagittal, position: [0, 0, 0.7, 1.0] },
+    { sliceType: nv1.sliceTypeCoronal, position: [0.7, 0, 0.3, 0.5] },
+    { sliceType: nv1.sliceTypeAxial, position: [0.7, 0.5, 0.3, 0.5] },
+  ]);
 
   // Setup event listeners
   setupEventListeners();
@@ -1538,8 +1463,9 @@ async function loadFile(file) {
     // Load file
     await nv1.loadFromFile(file);
 
-    // Hide drop zone
+    // Hide drop zone and show full app
     document.getElementById("dropZone").classList.add("hidden");
+    document.getElementById("appContainer").classList.remove("landing");
 
     // Conform to standard dimensions
     updateProgress(30, "Conforming image...");
@@ -1614,14 +1540,19 @@ async function runAnalysis() {
 }
 
 async function runSegmentation() {
-  const model = inferenceModelsList[DEFAULT_MODEL_INDEX];
+  const modelIndex = getActiveModelIndex();
+  lastUsedModelIndex = modelIndex;
+  const model = inferenceModelsList[modelIndex];
   const opts = { ...brainChopOpts };
   opts.rootURL = location.protocol + "//" + location.host;
 
   await ensureConformed();
 
+  // Server only supports 18-class; when bilateral (104-class) is selected, use local only
+  const useServer = USE_SERVER && modelIndex === DEFAULT_MODEL_INDEX;
+
   // Use server-side inference if enabled
-  if (USE_SERVER) {
+  if (useServer) {
     try {
       const result = await runServerInference(
         (message, progress) => {
@@ -1723,8 +1654,8 @@ async function generateAtrophyHeatmap() {
     return null;
   }
 
-  // Get colormap labels for region mapping
-  const model = inferenceModelsList[DEFAULT_MODEL_INDEX];
+  // Get colormap labels for region mapping (use same model as segmentation)
+  const model = inferenceModelsList[lastUsedModelIndex];
   const cmapPath = model.colormapPath.replace('./', '../');
   const response = await fetch(cmapPath);
   const cmap = await response.json();
@@ -1815,8 +1746,8 @@ async function toggleAtrophyHeatmap() {
 async function calculateVolumes() {
   if (!segmentationData) return;
 
-  // Get colormap labels for region mapping
-  const model = inferenceModelsList[DEFAULT_MODEL_INDEX];
+  // Get colormap labels for region mapping (use same model as segmentation)
+  const model = inferenceModelsList[lastUsedModelIndex];
   // Fix path - colormap is relative to root, not /atrophy/
   const cmapPath = model.colormapPath.replace('./', '../');
   const response = await fetch(cmapPath);
@@ -1838,6 +1769,29 @@ async function calculateVolumes() {
       regionVolumes[regionName] = count;  // mm³
     }
   });
+
+  // When using 104-class model, aggregate left/right to bilateral for normative analysis
+  if (lastUsedModelIndex === BILATERAL_MODEL_INDEX) {
+    const bilateralAggregates = {
+      "Hippocampus": ["Left-Hippocampus", "Right-Hippocampus"],
+      "Amygdala": ["Left-Amygdala", "Right-Amygdala"],
+      "Thalamus": ["Left-Thalamus-Proper*", "Right-Thalamus-Proper*"],
+      "Caudate": ["Left-Caudate", "Right-Caudate"],
+      "Putamen": ["Left-Putamen", "Right-Putamen"],
+      "Pallidum": ["Left-Pallidum", "Right-Pallidum"],
+      "Lateral-Ventricle": ["Left-Lateral-Ventricle", "Right-Lateral-Ventricle"],
+      "Inferior-Lateral-Ventricle": ["Left-Inf-Lat-Vent", "Right-Inf-Lat-Vent"],
+      "Accumbens-area": ["Left-Accumbens-area", "Right-Accumbens-area"],
+      "VentralDC": ["Left-VentralDC", "Right-VentralDC"],
+      "Cerebral-White-Matter": ["Left-Cerebral-White-Matter", "Right-Cerebral-White-Matter"],
+      "Cerebellum-White-Matter": ["Left-Cerebellum-White-Matter", "Right-Cerebellum-White-Matter"],
+      "Cerebellum-Cortex": ["Left-Cerebellum-Cortex", "Right-Cerebellum-Cortex"]
+    };
+    for (const [bilateralKey, lrLabels] of Object.entries(bilateralAggregates)) {
+      const sum = (regionVolumes[lrLabels[0]] || 0) + (regionVolumes[lrLabels[1]] || 0);
+      if (sum > 0) regionVolumes[bilateralKey] = sum;
+    }
+  }
 
   console.log("Region volumes:", regionVolumes);
 }
@@ -3222,7 +3176,6 @@ function displayResults() {
   // Show all cards
   document.getElementById("summaryCard").style.display = "block";
   document.getElementById("regionalCard").style.display = "block";
-  document.getElementById("findingsCard").style.display = "block";
   document.getElementById("exportCard").style.display = "block";
 
   // Summary
@@ -3239,11 +3192,6 @@ function displayResults() {
   // Display Medical-Grade Biomarkers
   // ========================================
   displayMedicalBiomarkers();
-
-  // ========================================
-  // Display Dementia Risk Comparison
-  // ========================================
-  displayRiskComparison();
 
   // ========================================
   // Display Advanced Analysis (Asymmetry, Lobar, GAI)
@@ -3279,40 +3227,6 @@ function displayResults() {
     regionsContainer.appendChild(item);
   }
 
-  // Findings
-  const findingsList = document.getElementById("findingsList");
-  findingsList.innerHTML = "";
-
-  if (analysisResults.findings.length === 0) {
-    findingsList.innerHTML = `
-      <div class="finding-item">
-        <svg class="finding-icon success" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-          <polyline points="22 4 12 14.01 9 11.01"/>
-        </svg>
-        <span>No significant atrophy detected. Brain volumes are within normal limits for age (${analysisResults.age}) and sex (${analysisResults.sex}).</span>
-      </div>
-    `;
-  } else {
-    for (const finding of analysisResults.findings) {
-      const item = document.createElement("div");
-      item.className = "finding-item";
-      const iconSvg = finding.severity === "danger"
-        ? '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>'
-        : finding.severity === "warning"
-          ? '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>'
-          : '<circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>';
-
-      item.innerHTML = `
-        <svg class="finding-icon ${finding.severity}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          ${iconSvg}
-        </svg>
-        <span>${finding.text}</span>
-      `;
-      findingsList.appendChild(item);
-    }
-  }
-
   // Add risk description if available
   if (analysisResults.riskDescription) {
     const riskDescEl = document.createElement("div");
@@ -3331,7 +3245,7 @@ function displayResults() {
 }
 
 function hideAnalysisCards() {
-  const ids = ["summaryCard", "riskComparisonCard", "advancedAnalysisCard", "regionalCard", "findingsCard", "exportCard"];
+  const ids = ["summaryCard", "advancedAnalysisCard", "regionalCard", "exportCard"];
   ids.forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = "none";
@@ -3353,11 +3267,10 @@ function displayAdvancedAnalysis() {
   // Global Atrophy Index
   // ========================================
   const gai = analysisResults.globalAtrophyIndex;
-  if (gai) {
-    const gaiValue = document.getElementById("gaiValue");
-    const gaiInterp = document.getElementById("gaiInterpretation");
-
-    gaiValue.textContent = `${gai.value}/100`;
+  const gaiValueEl = document.getElementById("gaiValue");
+  const gaiInterpEl = document.getElementById("gaiInterpretation");
+  if (gai && gaiValueEl && gaiInterpEl) {
+    gaiValueEl.textContent = `${gai.value}/100`;
 
     // Color code based on severity
     const severityColors = {
@@ -3366,8 +3279,8 @@ function displayAdvancedAnalysis() {
       moderate: "#f97316",
       severe: "#ef4444"
     };
-    gaiValue.style.color = severityColors[gai.severity] || "#a1a1aa";
-    gaiInterp.textContent = gai.interpretation;
+    gaiValueEl.style.color = severityColors[gai.severity] || "#a1a1aa";
+    gaiInterpEl.textContent = gai.interpretation;
   }
 
   // ========================================
@@ -3407,7 +3320,7 @@ function displayAdvancedAnalysis() {
   const asymmetryGrid = document.getElementById("asymmetryGrid");
   const asymmetrySummary = document.getElementById("asymmetrySummary");
 
-  if (asymmetryGrid && analysisResults.asymmetry) {
+  if (asymmetryGrid && asymmetrySummary && analysisResults.asymmetry) {
     asymmetryGrid.innerHTML = "";
     asymmetrySummary.textContent = analysisResults.asymmetry.summary;
 

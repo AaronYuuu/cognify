@@ -15,7 +15,7 @@
 </head>
 
 <body>
-  <div class="app-container">
+  <div class="app-container" id="appContainer">
     <!-- Header -->
     <header class="header">
       <div class="header-left">
@@ -53,6 +53,7 @@
           <canvas id="gl1"></canvas>
           <div class="drop-zone" id="dropZone">
             <div class="drop-content">
+              <p class="drop-app-title">Cognify</p>
               <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                 <polyline points="17 8 12 3 7 8" />
@@ -149,62 +150,6 @@
           </div>
         </div>
 
-        <!-- Dementia Risk Comparison Card -->
-        <div class="card" id="riskComparisonCard" style="display:none;">
-          <h3 class="card-title">
-            Atrophy Assessment
-            <span class="card-subtitle" id="assessmentModeLabel">Experimental Analysis</span>
-          </h3>
-          <div class="risk-comparison-grid">
-            <!-- AI Column (hidden in radiologist-first until revealed) -->
-            <div class="risk-column" id="aiResultsColumn">
-              <span class="risk-source">Model Output</span>
-              <span class="risk-score-value" id="aiRiskScore">--</span>
-              <span class="risk-label" id="aiRiskLabel">--</span>
-              <div class="risk-factors" id="aiRiskFactors"></div>
-            </div>
-            <!-- AI Hidden Placeholder (shown in radiologist-first mode) -->
-            <div class="risk-column ai-hidden-placeholder" id="aiHiddenPlaceholder" style="display:none;">
-              <span class="risk-source">Model Output</span>
-              <span class="risk-score-value hidden-score">?</span>
-              <span class="risk-label">Hidden until manual assessment</span>
-            </div>
-            <!-- Radiologist Column -->
-            <div class="risk-column radiologist" id="radiologistColumn">
-              <span class="risk-source">Manual Assessment</span>
-              <select id="radiologistRiskInput" class="risk-select">
-                <option value="">Select score...</option>
-                <option value="0">0 - No Risk</option>
-                <option value="1">1 - Minimal Risk</option>
-                <option value="2">2 - Low Risk</option>
-                <option value="3">3 - Moderate Risk</option>
-                <option value="4">4 - High Risk</option>
-                <option value="5">5 - Very High Risk</option>
-              </select>
-              <span class="risk-label" id="radiologistRiskLabel">&nbsp;</span>
-            </div>
-          </div>
-          <!-- Reveal AI Button (shown only in radiologist-first mode after score entered) -->
-          <div class="reveal-ai-section" id="revealAiSection" style="display:none;">
-            <button class="btn btn-primary" id="revealAiBtn">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                <circle cx="12" cy="12" r="3" />
-              </svg>
-              Reveal AI Results
-            </button>
-            <p class="reveal-hint">You can modify your score after viewing AI results</p>
-          </div>
-          <div class="discrepancy-alert" id="discrepancyAlert" style="display:none;">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="alert-icon">
-              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-              <line x1="12" y1="9" x2="12" y2="13" />
-              <line x1="12" y1="17" x2="12.01" y2="17" />
-            </svg>
-            <span id="discrepancyText">Discrepancy noted between model and manual assessments</span>
-          </div>
-        </div>
-
         <!-- AI Results Full Display (AI-First Mode Screen 1) -->
         <div class="card" id="aiResultsFullCard" style="display:none;">
           <h3 class="card-title">
@@ -261,6 +206,29 @@
           </div>
         </div>
 
+        <!-- Advanced Analysis (GAI, Lobar, L/R Asymmetry) -->
+        <div class="card" id="advancedAnalysisCard" style="display:none;">
+          <h3 class="card-title">Advanced Analysis</h3>
+          <div class="advanced-analysis-content">
+            <div class="advanced-section">
+              <h4 class="advanced-section-title">Global Atrophy Index</h4>
+              <div class="gai-display">
+                <span class="gai-value" id="gaiValue">--/100</span>
+                <span class="gai-interpretation" id="gaiInterpretation"></span>
+              </div>
+            </div>
+            <div class="advanced-section">
+              <h4 class="advanced-section-title">Lobar Atrophy</h4>
+              <div class="lobar-grid" id="lobarGrid"></div>
+            </div>
+            <div class="advanced-section">
+              <h4 class="advanced-section-title">L/R Asymmetry</h4>
+              <p class="asymmetry-summary" id="asymmetrySummary">--</p>
+              <div class="asymmetry-grid" id="asymmetryGrid"></div>
+            </div>
+          </div>
+        </div>
+
         <!-- Regional Analysis -->
         <div class="card" id="regionalCard" style="display:none;">
           <h3 class="card-title">
@@ -268,14 +236,6 @@
             <span class="card-subtitle">Z-scores relative to age-matched norms</span>
           </h3>
           <div class="regions-container" id="regionsContainer">
-            <!-- Dynamically populated -->
-          </div>
-        </div>
-
-        <!-- Findings -->
-        <div class="card" id="findingsCard" style="display:none;">
-          <h3 class="card-title">Key Findings</h3>
-          <div class="findings-list" id="findingsList">
             <!-- Dynamically populated -->
           </div>
         </div>
