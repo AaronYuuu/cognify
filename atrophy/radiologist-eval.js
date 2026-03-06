@@ -57,6 +57,30 @@ export const LOBES = [
     { id: "occipital", name: "Occipital" }
 ];
 
+/**
+ * Map normative/bilateral region keys to 104-class (Aparc+Aseg) label names.
+ * Used so extractAIScores can resolve regional atrophy from left/right segments.
+ */
+const REGION_KEY_TO_104_LABELS = {
+    "Lateral-Ventricle": ["Left-Lateral-Ventricle", "Right-Lateral-Ventricle"],
+    "3rd-Ventricle": ["3rd-Ventricle"],
+    "Inferior-Lateral-Ventricle": ["Left-Inf-Lat-Vent", "Right-Inf-Lat-Vent"],
+    "4th-Ventricle": ["4th-Ventricle"],
+    "Thalamus": ["Left-Thalamus-Proper*", "Right-Thalamus-Proper*"],
+    "Caudate": ["Left-Caudate", "Right-Caudate"],
+    "Putamen": ["Left-Putamen", "Right-Putamen"],
+    "Pallidum": ["Left-Pallidum", "Right-Pallidum"],
+    "Hippocampus": ["Left-Hippocampus", "Right-Hippocampus"],
+    "Amygdala": ["Left-Amygdala", "Right-Amygdala"],
+    "Accumbens-area": ["Left-Accumbens-area", "Right-Accumbens-area"],
+    "VentralDC": ["Left-VentralDC", "Right-VentralDC"],
+    "Cerebral-Cortex": [], // 104 has many ctx-*; no single key
+    "Cerebral-White-Matter": ["Left-Cerebral-White-Matter", "Right-Cerebral-White-Matter"],
+    "Brain-Stem": ["Brain-Stem"],
+    "Cerebellum-Cortex": ["Left-Cerebellum-Cortex", "Right-Cerebellum-Cortex"],
+    "Cerebellum-White-Matter": ["Left-Cerebellum-White-Matter", "Right-Cerebellum-White-Matter"]
+};
+
 export const GLOBAL_SCORES = [
     { id: "mta", name: "MTA", fullName: "Medial Temporal Atrophy", min: 0, max: 4, step: 1, type: "integer" },
     { id: "pa", name: "PA", fullName: "Parietal Atrophy (Koedam)", min: 0, max: 3, step: 1, type: "integer" },
@@ -286,12 +310,13 @@ export function buildAIResultsDisplay(containerId, aiData) {
  * @param {Object} rightData - Data for right column
  * @param {string} leftLabel - e.g. "AI Analysis" or "Your Assessment"
  * @param {string} rightLabel - e.g. "Your Assessment" or "AI Analysis"
- * @param {Object} options - { leftEditable: false, rightEditable: false }
+ * @param {Object} options - { leftEditable: false, rightEditable: false, rightSubtitle?: string }
  */
 export function buildSideBySideView(containerId, leftData, rightData, leftLabel, rightLabel, options = {}) {
     const container = document.getElementById(containerId);
     if (!container) return;
 
+    const rightSubtitle = options.rightSubtitle ? `<span class="side-by-side-subtitle">${options.rightSubtitle}</span>` : "";
     const html = `
     <div class="side-by-side-container">
       <div class="side-by-side-column" id="sideBySideLeft">
@@ -300,9 +325,10 @@ export function buildSideBySideView(containerId, leftData, rightData, leftLabel,
         </div>
         <div class="side-by-side-body" id="sideBySideLeftBody"></div>
       </div>
-      <div class="side-by-side-column" id="sideBySideRight">
+      <div class="side-by-side-column side-by-side-editable" id="sideBySideRight">
         <div class="side-by-side-header">
           <h4>${rightLabel}</h4>
+          ${rightSubtitle}
         </div>
         <div class="side-by-side-body" id="sideBySideRightBody"></div>
       </div>
@@ -455,15 +481,10 @@ export function extractAIScores(analysisResults) {
             : null;
     }
 
-    // Regional atrophy - map z-scores to severity
+    // Regional atrophy - map z-scores to severity (support 104-class left/right labels)
     for (const region of BRAIN_REGIONS) {
-        const regionData = analysisResults.regions?.[region.key];
-        if (regionData) {
-            const effectiveZ = regionData.effectiveZscore ?? regionData.zscore;
-            aiData.regionalAtrophy[region.id] = zscoreToAtrophyLevel(effectiveZ);
-        } else {
-            aiData.regionalAtrophy[region.id] = null;
-        }
+        const effectiveZ = getEffectiveZForRegion(analysisResults.regions, region.key);
+        aiData.regionalAtrophy[region.id] = effectiveZ !== null ? zscoreToAtrophyLevel(effectiveZ) : null;
     }
 
     // Lobar atrophy from lobar analysis
@@ -478,6 +499,31 @@ export function extractAIScores(analysisResults) {
     }
 
     return aiData;
+}
+
+/**
+ * Get effective z-score for a region from analysisResults.regions.
+ * Supports bilateral key (e.g. Hippocampus) and 104-class left/right labels.
+ * @param {Object} regions - analysisResults.regions
+ * @param {string} regionKey - BRAIN_REGIONS[].key
+ * @returns {number|null} effective z (lower = more atrophy), or null
+ */
+function getEffectiveZForRegion(regions, regionKey) {
+    if (!regions) return null;
+    const direct = regions[regionKey];
+    if (direct?.effectiveZscore != null) return direct.effectiveZscore;
+    if (direct?.zscore != null) return direct.zscore;
+    const labels = REGION_KEY_TO_104_LABELS[regionKey];
+    if (!labels || labels.length === 0) return null;
+    const zs = [];
+    for (const name of labels) {
+        const r = regions[name];
+        const z = r?.effectiveZscore ?? r?.zscore;
+        if (z != null) zs.push(z);
+    }
+    if (zs.length === 0) return null;
+    // Use worst (most negative) z so atrophy in either side is reflected
+    return Math.min(...zs);
 }
 
 /**

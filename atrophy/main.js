@@ -36,6 +36,46 @@ import {
 const USE_SERVER = true;  // Enable for GPU acceleration on weak devices
 const SERVER_URL = "https://aryagm-shia-brain.hf.space";
 
+// Upsample a cubic volume to 256³ if it is smaller (e.g., 128³) so that
+// the server model, which expects 256³, always receives the correct size.
+function upsampleTo256CubeIfNeeded(img) {
+  if (!(img instanceof Uint8Array)) {
+    const typeName = img?.constructor?.name ?? typeof img;
+    throw new Error(`Invalid tensor: expected Uint8Array, got ${typeName}`);
+  }
+  const len = img.length;
+  const TARGET = 256;
+  const TARGET_SIZE = TARGET * TARGET * TARGET;
+  if (len === TARGET_SIZE) {
+    return img;
+  }
+  const side = Math.round(Math.cbrt(len));
+  if (side * side * side !== len || side >= TARGET || TARGET % side !== 0) {
+    throw new Error(`Invalid tensor: expected 256³ or smaller cubic volume, got length ${len}`);
+  }
+  const scale = TARGET / side;
+  const out = new Uint8Array(TARGET_SIZE);
+  let srcIndex = 0;
+  for (let z = 0; z < side; z++) {
+    for (let y = 0; y < side; y++) {
+      for (let x = 0; x < side; x++, srcIndex++) {
+        const v = img[srcIndex];
+        for (let dz = 0; dz < scale; dz++) {
+          const Z = z * scale + dz;
+          for (let dy = 0; dy < scale; dy++) {
+            const Y = y * scale + dy;
+            let base = Z * TARGET * TARGET + Y * TARGET + x * scale;
+            for (let dx = 0; dx < scale; dx++) {
+              out[base + dx] = v;
+            }
+          }
+        }
+      }
+    }
+  }
+  return out;
+}
+
 /**
  * Run inference on the server (HuggingFace Space with GPU)
  * Falls back to local inference if server is unavailable
@@ -51,13 +91,9 @@ async function runServerInference(progressCallback) {
 
   progressCallback("Preparing tensor for upload...", 0.05);
 
-  // Get the conformed volume data from NiiVue
-  // After ensureConformed(), this is a 256³ Uint8Array
-  const tensorData = nv1.volumes[0].img;
-
-  if (!(tensorData instanceof Uint8Array) || tensorData.length !== 256 * 256 * 256) {
-    throw new Error(`Invalid tensor: expected 256³ Uint8Array, got ${tensorData.constructor.name} length ${tensorData.length}`);
-  }
+  // Get the conformed volume data from NiiVue and upsample to 256³ if needed
+  let tensorData = nv1.volumes[0].img;
+  tensorData = upsampleTo256CubeIfNeeded(tensorData);
 
   console.log(`Tensor data: ${tensorData.length} bytes, range [${Math.min(...tensorData.slice(0, 1000))}-${Math.max(...tensorData.slice(0, 1000))}]`);
 
@@ -3295,12 +3331,11 @@ function displayResults() {
 }
 
 function hideAnalysisCards() {
-  document.getElementById("summaryCard").style.display = "none";
-  document.getElementById("riskComparisonCard").style.display = "none";
-  document.getElementById("advancedAnalysisCard").style.display = "none";
-  document.getElementById("regionalCard").style.display = "none";
-  document.getElementById("findingsCard").style.display = "none";
-  document.getElementById("exportCard").style.display = "none";
+  const ids = ["summaryCard", "riskComparisonCard", "advancedAnalysisCard", "regionalCard", "findingsCard", "exportCard"];
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = "none";
+  });
 }
 
 /**
@@ -3992,9 +4027,8 @@ https://github.com/neuroneural/brainchop
 function updateProgress(percent, text) {
   const fill = document.getElementById("progressFill");
   const textEl = document.getElementById("progressText");
-
-  fill.style.width = percent + "%";
-  textEl.textContent = text;
+  if (fill) fill.style.width = percent + "%";
+  if (textEl) textEl.textContent = text;
 }
 
 function handleLocationChange(data) {

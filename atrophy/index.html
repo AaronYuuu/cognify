@@ -60,7 +60,7 @@
               </svg>
               <p class="drop-text">Drag & Drop NIfTI file</p>
               <p class="drop-subtext">or click to browse</p>
-              <input type="file" id="fileInput" accept=".nii,.nii.gz,.gz" hidden>
+              <input type="file" id="fileInput" accept=".nii,.nii.gz,.niigz,.gz" hidden>
             </div>
           </div>
         </div>
@@ -96,6 +96,13 @@
                 <option value="male">Male</option>
                 <option value="female">Female</option>
               </select>
+            </div>
+            <div class="form-group form-group-checkbox">
+              <label class="checkbox-label">
+                <input type="checkbox" id="bilateralAtrophyCheck" title="Uses 104-class model locally for Memory, Executive, Movement L/R asymmetry">
+                <span>Include bilateral atrophy (L/R asymmetry)</span>
+              </label>
+              <p class="form-hint">When checked: 104-class model (local only). Unchecked: 18-class (faster, server-compatible).</p>
             </div>
           </div>
 
@@ -202,15 +209,16 @@
         <div class="card" id="aiResultsFullCard" style="display:none;">
           <h3 class="card-title">
             AI Analysis Results
-            <span class="card-subtitle">Complete AI-generated scores</span>
+            <span class="card-subtitle">Review below, then edit as needed in the next step</span>
           </h3>
           <div id="aiResultsFullContainer"></div>
+          <p class="eval-proceed-hint">The next step will show an editable form prefilled with these AI results — change only what you need.</p>
           <div class="eval-actions">
             <button class="btn btn-primary eval-proceed-btn" id="proceedToReviewBtn">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
                 <path d="M5 12h14M12 5l7 7-7 7" />
               </svg>
-              Proceed to Manual Review
+              Proceed to Review &amp; Edit
             </button>
           </div>
         </div>
@@ -261,46 +269,6 @@
           </h3>
           <div class="regions-container" id="regionsContainer">
             <!-- Dynamically populated -->
-          </div>
-        </div>
-
-        <!-- Advanced Analysis (Phase 2) -->
-        <div class="card" id="advancedAnalysisCard" style="display:none;">
-          <h3 class="card-title">
-            Advanced Analysis
-            <span class="card-subtitle">Asymmetry & Lobar Tracking</span>
-          </h3>
-
-          <!-- Global Atrophy Index -->
-          <div class="biomarker-section" id="globalAtrophySection">
-            <div class="biomarker-header">
-              <span class="biomarker-name">Global Atrophy Index</span>
-              <span class="biomarker-value" id="gaiValue">--</span>
-            </div>
-            <div class="biomarker-details">
-              <span id="gaiInterpretation">--</span>
-            </div>
-          </div>
-
-          <!-- Lobar Atrophy Summary -->
-          <div class="biomarker-section" id="lobarAtrophySection">
-            <div class="biomarker-header">
-              <span class="biomarker-name">Lobar Atrophy</span>
-            </div>
-            <div class="lobar-grid" id="lobarGrid">
-              <!-- Dynamically populated -->
-            </div>
-          </div>
-
-          <!-- Asymmetry Analysis -->
-          <div class="biomarker-section" id="asymmetrySection">
-            <div class="biomarker-header">
-              <span class="biomarker-name">L/R Asymmetry</span>
-              <span class="biomarker-value" id="asymmetrySummary">--</span>
-            </div>
-            <div class="asymmetry-grid" id="asymmetryGrid">
-              <!-- Dynamically populated -->
-            </div>
           </div>
         </div>
 
